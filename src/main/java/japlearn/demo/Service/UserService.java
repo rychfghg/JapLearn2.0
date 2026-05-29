@@ -64,7 +64,7 @@ private void sendPasswordResetEmail(String email, String token) {
     try {
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
         helper.setTo(email);
-        helper.setFrom("JapLearn <mizuchwaan@gmail.com>"); // Use the same sender details
+        helper.setFrom("JapLearn <bacolod2186@gmail.com>"); // Use the same sender details
         helper.setSubject("Reset Password - JapLearn");
 
         // HTML email content (following the same design as confirmation email)
@@ -162,7 +162,7 @@ private void sendPasswordResetEmail(String email, String token) {
             try {
                 MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
                 helper.setTo(email);
-                helper.setFrom("JapLearn <mizuchwaan@gmail.com>");
+                helper.setFrom("JapLearn <bacolod2186@gmail.com>");
                 helper.setSubject("Email Confirmation - JapLearn");
         
                 // Hosted image URL

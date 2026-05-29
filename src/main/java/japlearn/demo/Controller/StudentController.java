@@ -54,11 +54,28 @@ public class StudentController {
         return ResponseEntity.ok(students);
     }
     
-    @GetMapping("/getStudentByEmail")
-    public Student getStudentByEmail(@RequestParam String email) {
-    	return studentService.getStudentByEmail(email);
+    // @GetMapping("/getStudentByEmail")
+    // public Student getStudentByEmail(@RequestParam String email) {
+    // 	return studentService.getStudentByEmail(email);
+    // }
+@GetMapping("/getStudentByEmail")
+public ResponseEntity<?> getStudentByEmail(@RequestParam String email) {
+    Student student = studentService.getStudentByEmail(email);
+
+    if (student == null) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Student not found"));
     }
 
+    return ResponseEntity.ok(student);
+
+    
+}
+@GetMapping("/getAllStudents")
+public ResponseEntity<List<Student>> getAllStudents() {
+    List<Student> students = studentService.getAllStudents();
+    return ResponseEntity.ok(students);
+
+}
     @PostMapping("/login")
     public ResponseEntity<Object> login(@RequestBody Map<String, String> payload) {
         String email = payload.get("email");

@@ -78,5 +78,9 @@ public class StudentService {
         }
         return false;
     }
+
+    public List<Student> getAllStudents() {
+    return studentRepository.findAll();
+}
 }
  
