@@ -18,6 +18,7 @@ public class StudentProgress {
     private boolean katakana3 = false;
     private boolean vocab1 = false;
     private boolean vocab2 = false;
+    private boolean vocab3 = false;
     private boolean sentence = false;
     private boolean badge1 = false;
     private boolean badge2 = false;
@@ -96,6 +97,10 @@ public class StudentProgress {
     public void setVocab2(boolean vocab2) {
         this.vocab2 = vocab2;
     }
+
+    public boolean isVocab3() { return vocab3; }
+
+    public void setVocab3(boolean vocab3) { this.vocab3 = vocab3; }
 
     public boolean isSentence() {
         return sentence;

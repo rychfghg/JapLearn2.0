@@ -1,6 +1,7 @@
 package japlearn.demo.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,20 @@ public class ScoreService {
     // Save a score
     public Score saveScore(Score score) {
         return scoreRepository.save(score);
+    }
+
+    public Score saveHighScore(Score attempt) {
+        Optional<Score> current = scoreRepository.findTopByEmailAndGameOrderByScoreDesc(
+                attempt.getEmail(), attempt.getGame());
+        if (current.isPresent() && current.get().getScore() >= attempt.getScore()) {
+            return current.get();
+        }
+        current.ifPresent(score -> attempt.setId(score.getId()));
+        return scoreRepository.save(attempt);
+    }
+
+    public Optional<Score> getHighScore(String email, String game) {
+        return scoreRepository.findTopByEmailAndGameOrderByScoreDesc(email, game);
     }
 
     // Delete a score by ID

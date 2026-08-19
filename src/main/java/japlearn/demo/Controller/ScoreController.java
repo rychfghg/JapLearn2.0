@@ -41,6 +41,21 @@ public class ScoreController {
         }
     }
 
+    @PostMapping("/high-score")
+    public ResponseEntity<Score> saveHighScore(@RequestBody Score score) {
+        if (score.getEmail() == null || score.getGame() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(scoreService.saveHighScore(score));
+    }
+
+    @GetMapping("/high-score")
+    public ResponseEntity<Score> getHighScore(@RequestParam String email, @RequestParam String game) {
+        return scoreService.getHighScore(email, game)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     @DeleteMapping("/delete")
     public ResponseEntity<String> deleteScore(@RequestParam String id) {
         try {

@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface QuackslateGameCodeRepository extends MongoRepository<QuackslateGameCode, Integer> {
+public interface QuackslateGameCodeRepository extends MongoRepository<QuackslateGameCode, String> {
 
     // Custom method to find a game by its game code
     Optional<QuackslateGameCode> findByGameCode(String gameCode);

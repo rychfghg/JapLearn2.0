@@ -12,6 +12,7 @@ public class Lesson {
 	private String classId;
 	private String lesson_title;
 	private String lesson_type;
+	private String lesson_description;
 	
 	public Lesson() {}
 
@@ -47,6 +48,14 @@ public class Lesson {
 
 	public void setLesson_type(String lesson_type) {
 		this.lesson_type = lesson_type;
+	}
+
+	public String getLesson_description() {
+		return lesson_description;
+	}
+
+	public void setLesson_description(String lesson_description) {
+		this.lesson_description = lesson_description;
 	}
 
 	public String getClassId() {

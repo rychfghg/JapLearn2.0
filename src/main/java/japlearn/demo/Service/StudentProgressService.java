@@ -3,6 +3,8 @@ package japlearn.demo.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 import japlearn.demo.Entity.StudentProgress;
 import japlearn.demo.Repository.StudentProgressRepository;
 
@@ -14,8 +16,21 @@ public class StudentProgressService {
 
     // Method to get student's progress
     public StudentProgress getProgress(String email) {
-        return studentProgressRepository.findByEmail(email)
+        StudentProgress progress = studentProgressRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Student progress not found for email: " + email));
+
+        // Older accounts earned badge2 when the Words path only contained two sets.
+        // Normalize that legacy badge until the new third collection is completed.
+        if (progress.isBadge2() && !progress.isVocab3()) {
+            progress.setBadge2(false);
+            return studentProgressRepository.save(progress);
+        }
+
+        return progress;
+    }
+
+    public List<StudentProgress> getAllProgress() {
+        return studentProgressRepository.findAll();
     }
 
     // Method to check the state of a specific field (e.g., vocab1, badge1)
@@ -48,6 +63,7 @@ public class StudentProgressService {
             case "vocab2" -> {
                 return progress.isVocab2();
             }
+            case "vocab3" -> { return progress.isVocab3(); }
             case "sentence" -> {
                 return progress.isSentence();
             }
@@ -66,12 +82,17 @@ public class StudentProgressService {
 
     // Method to save a new record with default progress
     public StudentProgress saveProgress(String email) {
+        return studentProgressRepository.findByEmail(email)
+                .orElseGet(() -> createInitialProgress(email));
+    }
+
+    private StudentProgress createInitialProgress(String email) {
         // Create a new StudentProgress object
         StudentProgress newProgress = new StudentProgress();
         
         // Set the email and default progress fields
         newProgress.setEmail(email);
-        newProgress.setHiragana1(true); // Assuming initial progress starts with hiragana1
+        newProgress.setHiragana1(false);
         newProgress.setHiragana2(false);
         newProgress.setHiragana3(false);
         newProgress.setKatakana1(false);
@@ -79,6 +100,7 @@ public class StudentProgressService {
         newProgress.setKatakana3(false);
         newProgress.setVocab1(false);
         newProgress.setVocab2(false);
+        newProgress.setVocab3(false);
         newProgress.setSentence(false);
         newProgress.setBadge1(false);  // Initially, badge1 is false
         newProgress.setBadge2(false);  // Initially, badge2 is false
@@ -92,7 +114,9 @@ public class StudentProgressService {
     public StudentProgress updateSingleField(String email, String field, boolean value) {
         // Fetch the existing progress by email
         StudentProgress existingProgress = studentProgressRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Student progress not found for email: " + email));
+                .orElseGet(() -> createInitialProgress(email));
+
+        boolean wasVocab3Complete = existingProgress.isVocab3();
 
         // Update the field based on the provided field name
         switch (field) {
@@ -104,11 +128,17 @@ public class StudentProgressService {
             case "katakana3" -> existingProgress.setKatakana3(value);
             case "vocab1" -> existingProgress.setVocab1(value);
             case "vocab2" -> existingProgress.setVocab2(value);
+            case "vocab3" -> existingProgress.setVocab3(value);
             case "sentence" -> existingProgress.setSentence(value);
             case "badge1" -> existingProgress.setBadge1(value);  // Update badge1
             case "badge2" -> existingProgress.setBadge2(value);  // Update badge2
             case "badge3" -> existingProgress.setBadge3(value);  // Update badge3
             default -> throw new IllegalArgumentException("Invalid field: " + field);
+        }
+
+        // Force a fresh Words badge award when a legacy learner completes Word 3.
+        if (field.equals("vocab3") && value && !wasVocab3Complete) {
+            existingProgress.setBadge2(false);
         }
 
         // Save the updated progress
@@ -129,6 +159,7 @@ public class StudentProgressService {
         existingProgress.setKatakana3(false);
         existingProgress.setVocab1(false);
         existingProgress.setVocab2(false);
+        existingProgress.setVocab3(false);
         existingProgress.setSentence(false);
         existingProgress.setBadge1(false);  // Reset badge1
         existingProgress.setBadge2(false);  // Reset badge2

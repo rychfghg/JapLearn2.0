@@ -40,7 +40,7 @@ public class QuackslateGameCodeService {
 
     // Fetch game code by levelID
     public String getGameCodeByLevelID(int levelID) {
-        return quackslateGameCodeRepository.findById(levelID)
+        return quackslateGameCodeRepository.findById(String.valueOf(levelID))
                 .map(QuackslateGameCode::getGameCode)  // Extract gameCode if present
                 .orElse(null);  // Return null if not present
     }

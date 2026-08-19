@@ -11,6 +11,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -76,6 +78,47 @@ public ResponseEntity<?> resetPassword(@RequestParam("token") String token, @Req
     public ResponseEntity<?> approveUser(@PathVariable String userId) {
         japlearnService.approveUser(userId);
         return ResponseEntity.ok("User approved");
+    }
+
+    @GetMapping
+    public ResponseEntity<List<User>> getAllUsers(@RequestParam(required = false) String role) {
+        List<User> users = role == null || role.isBlank()
+                ? japlearnService.getAllUsers()
+                : japlearnService.getUsersByRole(role);
+        users.forEach(user -> user.setPassword(null));
+        return ResponseEntity.ok(users);
+    }
+
+    @PostMapping("/admin-create")
+    public ResponseEntity<?> createManagedUser(@RequestBody Map<String, Object> values) {
+        try {
+            User user = japlearnService.createManagedUser(values);
+            user.setPassword(null);
+            return ResponseEntity.status(HttpStatus.CREATED).body(user);
+        } catch (IllegalArgumentException error) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", error.getMessage()));
+        }
+    }
+
+    @PutMapping("/{userId}")
+    public ResponseEntity<?> updateUser(@PathVariable String userId, @RequestBody Map<String, Object> updates) {
+        try {
+            User user = japlearnService.updateUser(userId, updates);
+            user.setPassword(null);
+            return ResponseEntity.ok(user);
+        } catch (IllegalArgumentException error) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", error.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<?> deleteUser(@PathVariable String userId) {
+        try {
+            japlearnService.deleteUser(userId);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException error) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", error.getMessage()));
+        }
     }
 
     @GetMapping("/confirm")

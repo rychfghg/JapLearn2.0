@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 import japlearn.demo.Entity.StudentProgress;
 import japlearn.demo.Service.StudentProgressService;
 
@@ -23,6 +25,11 @@ public class StudentProgressController {
 
     @Autowired
     private StudentProgressService studentProgressService;
+
+    @GetMapping
+    public List<StudentProgress> getAllProgress() {
+        return studentProgressService.getAllProgress();
+    }
 
     // Endpoint to get progress for a student by email
     @GetMapping("/{email}")

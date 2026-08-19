@@ -11,6 +11,7 @@ public class Score {
     private String name;
     private String email;
     private String date;
+    private String game;
     private int score;
 
     public Score() {
@@ -55,6 +56,10 @@ public class Score {
     public void setDate(String date) {
         this.date = date;
     }
+
+    public String getGame() { return game; }
+
+    public void setGame(String game) { this.game = game; }
 
     public int getScore() {
         return score;

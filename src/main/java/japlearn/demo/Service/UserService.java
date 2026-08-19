@@ -2,6 +2,7 @@ package japlearn.demo.Service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -124,6 +125,61 @@ private void sendPasswordResetEmail(String email, String token) {
             userRepository.save(user);
             
             // Transfer user data to Student if the user has a "student" role
+        }
+
+        public List<User> getAllUsers() {
+            return userRepository.findAll();
+        }
+
+        public List<User> getUsersByRole(String role) {
+            return userRepository.findByRoleIgnoreCase(role);
+        }
+
+        public User createManagedUser(Map<String, Object> values) {
+            String email = String.valueOf(values.get("email")).trim().toLowerCase();
+            if (userRepository.findByEmail(email) != null) throw new IllegalArgumentException("Email already exists");
+            User user = new User();
+            user.setFname(String.valueOf(values.get("fname")).trim());
+            user.setLname(String.valueOf(values.get("lname")).trim());
+            user.setEmail(email);
+            user.setRole(String.valueOf(values.get("role")).trim().toLowerCase());
+            user.setPassword(passwordEncoder.encode(String.valueOf(values.get("password"))));
+            user.setEmailConfirmed(Boolean.TRUE.equals(values.get("emailConfirmed")));
+            user.setApproved(Boolean.TRUE.equals(values.get("approved")));
+            return userRepository.save(user);
+        }
+
+        public User updateUser(String userId, Map<String, Object> updates) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            if (updates.containsKey("fname")) user.setFname(String.valueOf(updates.get("fname")).trim());
+            if (updates.containsKey("lname")) user.setLname(String.valueOf(updates.get("lname")).trim());
+            if (updates.containsKey("email")) user.setEmail(String.valueOf(updates.get("email")).trim().toLowerCase());
+            if (updates.containsKey("role")) user.setRole(String.valueOf(updates.get("role")).trim().toLowerCase());
+            if (updates.containsKey("approved")) user.setApproved(Boolean.TRUE.equals(updates.get("approved")));
+            if (updates.containsKey("emailConfirmed")) user.setEmailConfirmed(Boolean.TRUE.equals(updates.get("emailConfirmed")));
+            if (updates.containsKey("password") && updates.get("password") != null
+                    && !String.valueOf(updates.get("password")).isBlank()) {
+                user.setPassword(passwordEncoder.encode(String.valueOf(updates.get("password"))));
+            }
+            User saved = userRepository.save(user);
+            Student student = studentRepository.findByEmail(saved.getEmail());
+            if (student != null) {
+                student.setFname(saved.getFname());
+                student.setLname(saved.getLname());
+                student.setApproved(saved.isApproved());
+                student.setEmailConfirmed(saved.isEmailConfirmed());
+                studentRepository.save(student);
+            }
+            return saved;
+        }
+
+        public void deleteUser(String userId) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            Student student = studentRepository.findByEmail(user.getEmail());
+            if (student != null) studentRepository.delete(student);
+            userRepository.delete(user);
         }
 
         public String registerUser(User user) {
