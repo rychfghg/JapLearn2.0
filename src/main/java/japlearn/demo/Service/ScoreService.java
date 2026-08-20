@@ -34,6 +34,7 @@ public class ScoreService {
     public Optional<Score> getHighScore(String email, String game) {
         return scoreRepository.findTopByEmailAndGameOrderByScoreDesc(email, game);
     }
+    public List<Score> getScoresByEmail(String email) { return scoreRepository.findByEmailIgnoreCaseOrderByDateDesc(email); }
 
     // Delete a score by ID
     public void deleteScore(String id) {

@@ -230,6 +230,12 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
     }
 }
 
+    @PostMapping("/register-teacher")
+    public ResponseEntity<?> registerTeacher(@RequestBody User user) {
+        user.setRole("teacher");
+        return registerUser(user);
+    }
+
 
     @PostMapping("/login")
 public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {

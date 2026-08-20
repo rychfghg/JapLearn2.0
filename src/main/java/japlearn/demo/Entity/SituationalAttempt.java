@@ -19,6 +19,9 @@ public class SituationalAttempt {
     private int wrongAnswers;
     private double accuracy;
     private boolean completed;
+    private int level;
+    private int setNumber;
+    private String topic;
     private Instant completedAt = Instant.now();
 
     public String getId() { return id; }
@@ -43,6 +46,12 @@ public class SituationalAttempt {
     public void setAccuracy(double accuracy) { this.accuracy = accuracy; }
     public boolean isCompleted() { return completed; }
     public void setCompleted(boolean completed) { this.completed = completed; }
+    public int getLevel() { return level; }
+    public void setLevel(int level) { this.level = level; }
+    public int getSetNumber() { return setNumber; }
+    public void setSetNumber(int setNumber) { this.setNumber = setNumber; }
+    public String getTopic() { return topic; }
+    public void setTopic(String topic) { this.topic = topic; }
     public Instant getCompletedAt() { return completedAt; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
 }

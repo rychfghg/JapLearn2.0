@@ -55,6 +55,8 @@ public class ScoreController {
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
+    @GetMapping("/student")
+    public List<Score> getStudentScores(@RequestParam String email) { return scoreService.getScoresByEmail(email); }
 
     @DeleteMapping("/delete")
     public ResponseEntity<String> deleteScore(@RequestParam String id) {

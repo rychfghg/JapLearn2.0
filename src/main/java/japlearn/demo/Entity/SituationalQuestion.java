@@ -20,6 +20,9 @@ public class SituationalQuestion {
     private List<ResponseChoice> choices = new ArrayList<>();
     private String correctAnswer;
     private String explanation;
+    private int level;
+    private int setNumber;
+    private String topic;
     private boolean active = true;
 
     public String getId() { return id; }
@@ -44,6 +47,12 @@ public class SituationalQuestion {
     public void setCorrectAnswer(String correctAnswer) { this.correctAnswer = correctAnswer; }
     public String getExplanation() { return explanation; }
     public void setExplanation(String explanation) { this.explanation = explanation; }
+    public int getLevel() { return level; }
+    public void setLevel(int level) { this.level = level; }
+    public int getSetNumber() { return setNumber; }
+    public void setSetNumber(int setNumber) { this.setNumber = setNumber; }
+    public String getTopic() { return topic; }
+    public void setTopic(String topic) { this.topic = topic; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
 

@@ -31,8 +31,9 @@ public class CommunicationAnalyticsController {
 
         double recognitionAccuracy = averageAccuracy(records, "RECOGNITION");
         double responseAccuracy = averageAccuracy(records, "RESPONSE");
-        double situationalAccuracy = averageAccuracy(records, "SITUATIONAL");
-        if (situationalAccuracy == 0) situationalAccuracy = recognitionAccuracy;
+        double expressionAccuracy = averageAccuracy(records, "EXPRESSION_MATCH");
+        double politenessAccuracy = averageAccuracy(records, "POLITENESS");
+        double situationalAccuracy = averageOfAvailable(recognitionAccuracy, expressionAccuracy, politenessAccuracy);
 
         List<String> strengths = new ArrayList<>();
         List<String> weakAreas = new ArrayList<>();
@@ -56,12 +57,20 @@ public class CommunicationAnalyticsController {
         analytics.put("quackSituateAccuracy", round(situationalAccuracy));
         analytics.put("quackResponseAccuracy", round(responseAccuracy));
         analytics.put("recognitionAccuracy", round(recognitionAccuracy));
+        analytics.put("expressionMatchAccuracy", round(expressionAccuracy));
+        analytics.put("politenessAccuracy", round(politenessAccuracy));
         analytics.put("completedActivities", records.size());
         analytics.put("weakAreaCount", weakAreas.size());
         analytics.put("strengths", strengths);
         analytics.put("weakAreas", weakAreas);
         analytics.put("recommendation", recommendation);
         return analytics;
+    }
+
+    private double averageOfAvailable(double... values) {
+        double sum = 0; int count = 0;
+        for (double value : values) if (value > 0) { sum += value; count++; }
+        return count == 0 ? 0 : sum / count;
     }
 
     private double averageAccuracy(List<SituationalAttempt> records, String gameType) {
