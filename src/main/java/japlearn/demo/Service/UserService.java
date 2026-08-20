@@ -220,7 +220,7 @@ private void sendPasswordResetEmail(String email, String token) {
         
 
         private void sendConfirmationEmail(String email, String token) {
-            String confirmationUrl = appBackendUrl + "/api/users/confirm?token=" + token;
+            String confirmationUrl = appFrontendUrl + "/ConfirmEmail?token=" + token;
         
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             try {
