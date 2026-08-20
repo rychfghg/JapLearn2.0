@@ -32,3 +32,8 @@ build/
 ### VS Code ###
 .vscode/
 /.apt_generated_tests/
+
+# Local environment files can contain production credentials.
+.env
+.env.*
+!.env.example

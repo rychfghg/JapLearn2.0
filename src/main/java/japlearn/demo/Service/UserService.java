@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -22,8 +23,14 @@ import japlearn.demo.Repository.UserRepository;
 
 @Service
 public class UserService {
-    @Value("${app.base-url}")
-    private String appBaseUrl;
+    @Value("${app.backend-url}")
+    private String appBackendUrl;
+
+    @Value("${app.frontend-url}")
+    private String appFrontendUrl;
+
+    @Value("${app.mail.from-address}")
+    private String mailFromAddress;
     
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
@@ -59,27 +66,28 @@ public class UserService {
     // Send reset password email
 private void sendPasswordResetEmail(String email, String token) {
     // Change the reset URL to use localhost
-    String resetUrl = appBaseUrl + "/ResetPassword?token=" + token;
+    String resetUrl = appFrontendUrl + "/ResetPassword?token=" + token;
 
     MimeMessage mimeMessage = mailSender.createMimeMessage();
     try {
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
         helper.setTo(email);
-        helper.setFrom("JapLearn <bacolod2186@gmail.com>"); // Use the same sender details
+        // Previous sender fallback:
+        // helper.setFrom("JapLearn <bacolod2186@gmail.com>");
+        helper.setFrom("JapLearn <" + mailFromAddress + ">");
         helper.setSubject("Reset Password - JapLearn");
 
-        // HTML email content (following the same design as confirmation email)
-        String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;'>"
-                           + "<h2 style='text-align: center; color: #333;'>Password Reset Request</h2>"
-                           + "<p style='text-align: center; color: #555;'>You have requested to reset your password. Please click the button below to reset your password:</p>"
-                           + "<div style='text-align: center; margin: 30px;'>"
-                           + "  <a href='" + resetUrl + "' style='background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; font-size: 16px; border-radius: 5px;'>Reset Password</a>"
-                           + "</div>"
-                           + "<p style='text-align: center; color: #777;'>If you did not request this, please ignore this email.</p>"
-                           + "<p style='text-align: center; color: #777;'>Thank you, <br> The JapLearn Team</p>"
-                           + "</div>";
+        String htmlContent = buildEmailTemplate(
+                "ACCOUNT SECURITY",
+                "Reset your password",
+                "We received a request to create a new password for your JapLearn account.",
+                "Reset password",
+                resetUrl,
+                "If you did not request this change, you can safely ignore this email. Your current password will remain unchanged."
+        );
 
-        helper.setText(htmlContent, true); // Set 'true' to send HTML content
+        helper.setText(htmlContent, true);
+        helper.addInline("japlearnLogo", new ClassPathResource("mail/japlearn-logo.png"));
         mailSender.send(mimeMessage);
     } catch (MessagingException e) {
         e.printStackTrace();  // Log the exception
@@ -212,39 +220,69 @@ private void sendPasswordResetEmail(String email, String token) {
         
 
         private void sendConfirmationEmail(String email, String token) {
-            String confirmationUrl = appBaseUrl+ "/api/users/confirm?token=" + token;
+            String confirmationUrl = appBackendUrl + "/api/users/confirm?token=" + token;
         
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             try {
                 MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
                 helper.setTo(email);
-                helper.setFrom("JapLearn <bacolod2186@gmail.com>");
+                // Previous sender fallback:
+                // helper.setFrom("JapLearn <bacolod2186@gmail.com>");
+                helper.setFrom("JapLearn <" + mailFromAddress + ">");
                 helper.setSubject("Email Confirmation - JapLearn");
         
-                // Hosted image URL
-                String hostedImageUrl = "https://Unnivyu.github.io/Japlearn-1/assets/svg/jpLogo.svg";
+                String htmlContent = buildEmailTemplate(
+                        "WELCOME TO JAPLEARN",
+                        "Your Japanese journey starts here",
+                        "Confirm your email address to activate your account and begin learning with JapLearn.",
+                        "Confirm my email",
+                        confirmationUrl,
+                        "If you did not create a JapLearn account, you can safely ignore this email."
+                );
         
-                // HTML email content
-                String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;'>"
-                                   + "  <h2 style='text-align: center; color: #333;'>Welcome to JapLearn!</h2>"
-                                   + "  <div style='text-align: center; margin: 20px auto;'>"
-                                   + "    <img src='" + hostedImageUrl + "' alt='JapLearn Mascot' style='max-width: 150px; height: auto;' />"
-                                   + "  </div>"
-                                   + "  <p style='text-align: center; color: #555;'>Please confirm your email address by clicking the button below:</p>"
-                                   + "  <div style='text-align: center; margin: 30px;'>"
-                                   + "    <a href='" + confirmationUrl + "' style='background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; font-size: 16px; border-radius: 5px;'>Confirm Email</a>"
-                                   + "  </div>"
-                                   + "  <p style='text-align: center; color: #777;'>If you did not request this, please ignore this email.</p>"
-                                   + "  <p style='text-align: center; color: #777;'>Thank you, <br> The JapLearn Team</p>"
-                                   + "</div>";
-        
-                helper.setText(htmlContent, true); // Set 'true' to send HTML content
+                helper.setText(htmlContent, true);
+                helper.addInline("japlearnLogo", new ClassPathResource("mail/japlearn-logo.png"));
         
                 mailSender.send(mimeMessage);
             } catch (MessagingException e) {
                 e.printStackTrace();  // Log the exception
                 throw new RuntimeException("Failed to send email", e);
             }
+        }
+
+        private String buildEmailTemplate(
+                String eyebrow,
+                String title,
+                String description,
+                String actionText,
+                String actionUrl,
+                String securityNote
+        ) {
+            return "<!doctype html>"
+                    + "<html><body style='margin:0;padding:0;background-color:#F7F3FA;'>"
+                    + "<table role='presentation' width='100%' cellspacing='0' cellpadding='0' border='0' style='background-color:#F7F3FA;'>"
+                    + "<tr><td align='center' style='padding:32px 14px;'>"
+                    + "<table role='presentation' width='100%' cellspacing='0' cellpadding='0' border='0' style='max-width:560px;background:#FFFFFF;border-radius:24px;overflow:hidden;border:1px solid #E8DFF0;'>"
+                    + "<tr><td style='height:8px;background:#8423D9;font-size:0;line-height:0;'>&nbsp;</td></tr>"
+                    + "<tr><td align='center' style='padding:34px 34px 12px;'>"
+                    + "<div style='width:76px;height:76px;margin:0 auto 16px;border-radius:22px;background:#F0E4FA;padding:8px;box-sizing:border-box;'>"
+                    + "<img src='cid:japlearnLogo' width='60' height='60' alt='JapLearn' style='display:block;width:60px;height:60px;border:0;border-radius:16px;'>"
+                    + "</div>"
+                    + "<div style='font-family:Arial,sans-serif;font-size:12px;line-height:18px;font-weight:700;letter-spacing:1.5px;color:#65A936;'>" + eyebrow + "</div>"
+                    + "<h1 style='margin:8px 0 10px;font-family:Arial,sans-serif;font-size:28px;line-height:35px;font-weight:700;color:#34203F;'>" + title + "</h1>"
+                    + "<p style='margin:0 auto;max-width:430px;font-family:Arial,sans-serif;font-size:15px;line-height:24px;color:#6E6275;'>" + description + "</p>"
+                    + "</td></tr>"
+                    + "<tr><td align='center' style='padding:20px 34px 28px;'>"
+                    + "<a href='" + actionUrl + "' style='display:inline-block;background:#8423D9;color:#FFFFFF;text-decoration:none;font-family:Arial,sans-serif;font-size:15px;line-height:20px;font-weight:700;padding:14px 28px;border-radius:12px;'>" + actionText + " &nbsp;&#8594;</a>"
+                    + "<p style='margin:22px auto 0;max-width:420px;padding:13px 16px;border-radius:12px;background:#FAF7FC;font-family:Arial,sans-serif;font-size:12px;line-height:19px;color:#817586;'>" + securityNote + "</p>"
+                    + "</td></tr>"
+                    + "<tr><td style='padding:20px 30px;background:#F5EFF9;text-align:center;'>"
+                    + "<p style='margin:0;font-family:Arial,sans-serif;font-size:12px;line-height:18px;color:#6F6277;'>Keep learning, one small step at a time.</p>"
+                    + "<p style='margin:4px 0 0;font-family:Arial,sans-serif;font-size:12px;line-height:18px;font-weight:700;color:#4D365A;'>The JapLearn Team</p>"
+                    + "<p style='margin:8px 0 0;font-family:Arial,sans-serif;font-size:11px;line-height:17px;color:#9A8FA0;'>japlearnofficial@gmail.com</p>"
+                    + "</td></tr></table>"
+                    + "</td></tr></table>"
+                    + "</body></html>";
         }
         
         
