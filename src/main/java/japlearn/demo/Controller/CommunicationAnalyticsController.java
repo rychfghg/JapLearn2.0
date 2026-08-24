@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import japlearn.demo.Entity.SituationalAttempt;
+import japlearn.demo.Entity.QuackTalkSession;
+import japlearn.demo.Repository.QuackTalkSessionRepository;
 import japlearn.demo.Repository.SituationalAttemptRepository;
 
 @CrossOrigin(origins = "*")
@@ -19,15 +21,21 @@ import japlearn.demo.Repository.SituationalAttemptRepository;
 @RequestMapping("/api/communicationAnalytics")
 public class CommunicationAnalyticsController {
     private final SituationalAttemptRepository attempts;
+    private final QuackTalkSessionRepository talkSessions;
 
-    public CommunicationAnalyticsController(SituationalAttemptRepository attempts) {
+    public CommunicationAnalyticsController(
+            SituationalAttemptRepository attempts,
+            QuackTalkSessionRepository talkSessions) {
         this.attempts = attempts;
+        this.talkSessions = talkSessions;
     }
 
     @GetMapping("/getStudentAnalytics")
     public Map<String, Object> getStudentAnalytics(@RequestParam String email) {
         List<SituationalAttempt> records = attempts
                 .findByEmailIgnoreCaseAndCompletedTrueOrderByCompletedAtDesc(email);
+        List<QuackTalkSession> speakingRecords = talkSessions
+                .findByEmailIgnoreCaseOrderByPracticedAtDesc(email);
 
         double recognitionAccuracy = averageAccuracy(records, "RECOGNITION");
         double responseAccuracy = averageAccuracy(records, "RESPONSE");
@@ -53,13 +61,22 @@ public class CommunicationAnalyticsController {
         }
 
         Map<String, Object> analytics = new LinkedHashMap<>();
-        analytics.put("quackTalkAccuracy", 0);
+        analytics.put("quackTalkAccuracy", averageEvaluatedSpeakingScore(speakingRecords));
+        analytics.put("quackTalkPracticeSessions", speakingRecords.size());
+        analytics.put(
+                "quackTalkPracticeSeconds",
+                speakingRecords.stream().mapToInt(QuackTalkSession::getDurationSeconds).sum());
+        analytics.put(
+                "quackTalkEvaluationStatus",
+                speakingRecords.stream().anyMatch(QuackTalkSession::isEvaluated)
+                        ? "EVALUATED"
+                        : "PRACTICE_ONLY");
         analytics.put("quackSituateAccuracy", round(situationalAccuracy));
         analytics.put("quackResponseAccuracy", round(responseAccuracy));
         analytics.put("recognitionAccuracy", round(recognitionAccuracy));
         analytics.put("expressionMatchAccuracy", round(expressionAccuracy));
         analytics.put("politenessAccuracy", round(politenessAccuracy));
-        analytics.put("completedActivities", records.size());
+        analytics.put("completedActivities", records.size() + speakingRecords.size());
         analytics.put("weakAreaCount", weakAreas.size());
         analytics.put("strengths", strengths);
         analytics.put("weakAreas", weakAreas);
@@ -83,5 +100,14 @@ public class CommunicationAnalyticsController {
 
     private int round(double value) {
         return (int) Math.round(value);
+    }
+
+    private int averageEvaluatedSpeakingScore(List<QuackTalkSession> records) {
+        return (int) Math.round(records.stream()
+                .filter(QuackTalkSession::isEvaluated)
+                .filter(record -> record.getScore() != null)
+                .mapToInt(QuackTalkSession::getScore)
+                .average()
+                .orElse(0));
     }
 }
