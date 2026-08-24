@@ -1,5 +1,8 @@
 package japlearn.demo.Service;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.Map;
@@ -23,6 +26,7 @@ import japlearn.demo.Repository.UserRepository;
 
 @Service
 public class UserService {
+    private static final ZoneId JAPLEARN_TIME_ZONE = ZoneId.of("Asia/Manila");
     @Value("${app.backend-url}")
     private String appBackendUrl;
 
@@ -139,8 +143,67 @@ private void sendPasswordResetEmail(String email, String token) {
             return userRepository.findAll();
         }
 
-        public List<User> getUsersByRole(String role) {
+    public List<User> getUsersByRole(String role) {
             return userRepository.findByRoleIgnoreCase(role);
+        }
+
+        public synchronized Map<String, Object> getDailyGoalStreak(String email) {
+            User user = requireUserByEmail(email);
+            LocalDate today = LocalDate.now(JAPLEARN_TIME_ZONE);
+            LocalDate lastCompleted = user.getDailyGoalLastCompletedDate();
+
+            if (lastCompleted != null
+                    && lastCompleted.isBefore(today.minusDays(1))
+                    && user.getDailyGoalStreak() != 0) {
+                user.setDailyGoalStreak(0);
+                userRepository.save(user);
+            }
+
+            return dailyGoalStreakResponse(user, today);
+        }
+
+        public synchronized Map<String, Object> completeDailyGoal(String email) {
+            User user = requireUserByEmail(email);
+            LocalDate today = LocalDate.now(JAPLEARN_TIME_ZONE);
+            LocalDate lastCompleted = user.getDailyGoalLastCompletedDate();
+
+            if (!today.equals(lastCompleted)) {
+                int nextStreak = today.minusDays(1).equals(lastCompleted)
+                        ? user.getDailyGoalStreak() + 1
+                        : 1;
+
+                user.setDailyGoalStreak(nextStreak);
+                user.setDailyGoalLastCompletedDate(today);
+                userRepository.save(user);
+            }
+
+            return dailyGoalStreakResponse(user, today);
+        }
+
+        private User requireUserByEmail(String email) {
+            if (email == null || email.isBlank()) {
+                throw new IllegalArgumentException("Email is required");
+            }
+
+            User user = userRepository.findByEmail(email.trim().toLowerCase());
+            if (user == null) {
+                throw new IllegalArgumentException("User not found");
+            }
+
+            return user;
+        }
+
+        private Map<String, Object> dailyGoalStreakResponse(User user, LocalDate today) {
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("streak", user.getDailyGoalStreak());
+            response.put(
+                    "lastCompletedDate",
+                    user.getDailyGoalLastCompletedDate() == null
+                            ? ""
+                            : user.getDailyGoalLastCompletedDate().toString()
+            );
+            response.put("completedToday", today.equals(user.getDailyGoalLastCompletedDate()));
+            return response;
         }
 
         public User createManagedUser(Map<String, Object> values) {

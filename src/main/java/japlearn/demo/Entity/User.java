@@ -1,5 +1,6 @@
 package japlearn.demo.Entity;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import org.springframework.data.annotation.Id;
@@ -22,6 +23,8 @@ public class User {
     private boolean isApproved = false;
     private String resetToken;
     private LocalDateTime resetTokenExpiry;
+    private int dailyGoalStreak;
+    private LocalDate dailyGoalLastCompletedDate;
 
     public User() {
     }
@@ -58,6 +61,22 @@ public class User {
 
     public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) {
         this.resetTokenExpiry = resetTokenExpiry;
+    }
+
+    public int getDailyGoalStreak() {
+        return dailyGoalStreak;
+    }
+
+    public void setDailyGoalStreak(int dailyGoalStreak) {
+        this.dailyGoalStreak = dailyGoalStreak;
+    }
+
+    public LocalDate getDailyGoalLastCompletedDate() {
+        return dailyGoalLastCompletedDate;
+    }
+
+    public void setDailyGoalLastCompletedDate(LocalDate dailyGoalLastCompletedDate) {
+        this.dailyGoalLastCompletedDate = dailyGoalLastCompletedDate;
     }
 
     // Other Getters and Setters remain unchanged
