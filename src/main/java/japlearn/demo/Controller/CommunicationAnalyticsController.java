@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import japlearn.demo.Entity.SituationalAttempt;
 import japlearn.demo.Entity.QuackTalkSession;
+import japlearn.demo.Entity.ReplyCoachAttempt;
+import japlearn.demo.Repository.ReplyCoachAttemptRepository;
 import japlearn.demo.Repository.QuackTalkSessionRepository;
 import japlearn.demo.Repository.SituationalAttemptRepository;
 
@@ -22,12 +24,15 @@ import japlearn.demo.Repository.SituationalAttemptRepository;
 public class CommunicationAnalyticsController {
     private final SituationalAttemptRepository attempts;
     private final QuackTalkSessionRepository talkSessions;
+    private final ReplyCoachAttemptRepository replyCoachAttempts;
 
     public CommunicationAnalyticsController(
             SituationalAttemptRepository attempts,
-            QuackTalkSessionRepository talkSessions) {
+            QuackTalkSessionRepository talkSessions,
+            ReplyCoachAttemptRepository replyCoachAttempts) {
         this.attempts = attempts;
         this.talkSessions = talkSessions;
+        this.replyCoachAttempts = replyCoachAttempts;
     }
 
     @GetMapping("/getStudentAnalytics")
@@ -36,9 +41,14 @@ public class CommunicationAnalyticsController {
                 .findByEmailIgnoreCaseAndCompletedTrueOrderByCompletedAtDesc(email);
         List<QuackTalkSession> speakingRecords = talkSessions
                 .findByEmailIgnoreCaseOrderByPracticedAtDesc(email);
+        List<ReplyCoachAttempt> replyCoachRecords = replyCoachAttempts
+                .findByEmailIgnoreCaseAndStatusIgnoreCaseOrderByUpdatedAtDesc(email, "COMPLETED");
 
         double recognitionAccuracy = averageAccuracy(records, "RECOGNITION");
-        double responseAccuracy = averageAccuracy(records, "RESPONSE");
+        double responseAccuracy = replyCoachRecords.stream()
+                .mapToInt(ReplyCoachAttempt::getFinalPercentage)
+                .average()
+                .orElse(averageAccuracy(records, "RESPONSE"));
         double expressionAccuracy = averageAccuracy(records, "EXPRESSION_MATCH");
         double politenessAccuracy = averageAccuracy(records, "POLITENESS");
         double situationalAccuracy = averageOfAvailable(recognitionAccuracy, expressionAccuracy, politenessAccuracy);
@@ -76,7 +86,12 @@ public class CommunicationAnalyticsController {
         analytics.put("recognitionAccuracy", round(recognitionAccuracy));
         analytics.put("expressionMatchAccuracy", round(expressionAccuracy));
         analytics.put("politenessAccuracy", round(politenessAccuracy));
-        analytics.put("completedActivities", records.size() + speakingRecords.size());
+        analytics.put("completedActivities", records.size() + speakingRecords.size() + replyCoachRecords.size());
+        analytics.put("replyCoachCompletedChapters", replyCoachRecords.stream()
+                .map(ReplyCoachAttempt::getChapterId).distinct().count());
+        analytics.put("replyCoachAttempts", replyCoachRecords.size());
+        analytics.put("replyCoachBestScore", replyCoachRecords.stream()
+                .mapToInt(ReplyCoachAttempt::getFinalPercentage).max().orElse(0));
         analytics.put("weakAreaCount", weakAreas.size());
         analytics.put("strengths", strengths);
         analytics.put("weakAreas", weakAreas);
