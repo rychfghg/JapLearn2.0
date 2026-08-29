@@ -39,9 +39,14 @@ public class ReplyCoachChapterSeeder {
     @Bean
     CommandLineRunner seedReplyCoachChapter(ReplyCoachChapterRepository repository) {
         return args -> {
-            if (!repository.findAll().isEmpty()) return;
+            ReplyCoachChapter chapter = repository
+                    .findByTitleIgnoreCase("A Day of First Impressions")
+                    .orElseGet(ReplyCoachChapter::new);
+            boolean currentStoryVersion = chapter.getNodes() != null
+                    && chapter.getNodes().stream()
+                            .anyMatch(node -> "dialogue-1-companion".equals(node.getId()));
+            if (currentStoryVersion) return;
 
-            ReplyCoachChapter chapter = new ReplyCoachChapter();
             chapter.setTitle("A Day of First Impressions");
             chapter.setDescription("Join Sumi and Haru for a connected first-day journey through Tokyo while learning natural replies, etiquette, and respectful behavior.");
             chapter.setDifficulty("BEGINNER_TO_INTERMEDIATE");
@@ -60,7 +65,7 @@ public class ReplyCoachChapterSeeder {
                     "opening",
                     "NARRATION",
                     "Tokyo, 8:10 AM",
-                    "Your first full day in Japan begins. Sumi and Haru have planned a route that will take you from the station to dinner with a host family.",
+                    "The morning train releases a stream of commuters into central Tokyo. Today is your first full day in Japan, and Sumi and Haru have promised to guide you through the small social moments that guidebooks rarely explain.",
                     "station",
                     "scene-1",
                     false));
@@ -71,6 +76,7 @@ public class ReplyCoachChapterSeeder {
                 Encounter encounter = encounters.get(index);
                 String nextScene = number == encounters.size() ? "ending-narration" : "scene-" + (number + 1);
                 String dialogueId = "dialogue-" + number;
+                String companionDialogueId = "dialogue-" + number + "-companion";
                 String choiceId = "decision-" + number;
                 String mergeId = "merge-" + number;
 
@@ -89,7 +95,7 @@ public class ReplyCoachChapterSeeder {
                         encounter.speaker(),
                         encounter.dialogue(),
                         encounter.background(),
-                        choiceId,
+                        companionDialogueId,
                         true);
                 dialogue.setSpeaker(encounter.speaker());
                 dialogue.setJapanese(encounter.japanese());
@@ -99,6 +105,30 @@ public class ReplyCoachChapterSeeder {
                 dialogue.setSecondaryCharacterKey("Sumi".equals(encounter.speaker()) ? "HARU" : "SUMI");
                 dialogue.setSecondaryExpressionKey("NEUTRAL");
                 nodes.add(dialogue);
+
+                String companionKey = "Sumi".equals(encounter.speaker()) ? "HARU" : "SUMI";
+                String companionName = "SUMI".equals(companionKey) ? "Sumi" : "Haru";
+                ReplyCoachChapter.StoryNode companionDialogue = node(
+                        companionDialogueId,
+                        "DIALOGUE",
+                        companionName,
+                        companionName + " looks toward you and brings you into the conversation.",
+                        encounter.background(),
+                        choiceId,
+                        true);
+                companionDialogue.setSpeaker(companionName);
+                companionDialogue.setJapanese(number % 2 == 0
+                        ? "そうだね。あなたなら、どう答える？"
+                        : "一緒に考えよう。あなたは何と言う？");
+                companionDialogue.setRomaji(number % 2 == 0
+                        ? "Sou da ne. Anata nara, dou kotaeru?"
+                        : "Issho ni kangaeyou. Anata wa nan to iu?");
+                companionDialogue.setCharacterKey(companionKey);
+                companionDialogue.setExpressionKey("SPEAKING");
+                companionDialogue.setSecondaryCharacterKey(
+                        "SUMI".equals(companionKey) ? "HARU" : "SUMI");
+                companionDialogue.setSecondaryExpressionKey("NEUTRAL");
+                nodes.add(companionDialogue);
 
                 ReplyCoachChapter.StoryNode choice = node(
                         choiceId,
@@ -155,6 +185,14 @@ public class ReplyCoachChapterSeeder {
                 merge.setExpressionKey("SMILE");
                 merge.setSecondaryCharacterKey("HARU");
                 merge.setSecondaryExpressionKey("SMILE");
+                if (number % 4 != 0) {
+                    merge.setJapanese(number % 2 == 0
+                            ? "うん、覚えておこう。次へ行こう！"
+                            : "いい経験になったね。続きを見に行こう！");
+                    merge.setRomaji(number % 2 == 0
+                            ? "Un, oboete okou. Tsugi e ikou!"
+                            : "Ii keiken ni natta ne. Tsuzuki o mi ni ikou!");
+                }
                 nodes.add(merge);
             }
 
@@ -241,6 +279,24 @@ public class ReplyCoachChapterSeeder {
         node.setExpressionKey(expression);
         node.setSecondaryCharacterKey(character.equals("SUMI") ? "HARU" : "SUMI");
         node.setSecondaryExpressionKey("NEUTRAL");
+        switch (option.getEvaluation()) {
+            case "BEST" -> {
+                node.setJapanese("うん、とても自然でいい答えだね！");
+                node.setRomaji("Un, totemo shizen de ii kotae da ne!");
+            }
+            case "ACCEPTABLE" -> {
+                node.setJapanese("通じるけど、もう少し自然に言えるよ。");
+                node.setRomaji("Tsujiru kedo, mou sukoshi shizen ni ieru yo.");
+            }
+            case "AWKWARD" -> {
+                node.setJapanese("ちょっと不自然に聞こえるかもしれないね。");
+                node.setRomaji("Chotto fushizen ni kikoeru kamo shirenai ne.");
+            }
+            default -> {
+                node.setJapanese("その言い方は失礼に聞こえるよ。気をつけよう。");
+                node.setRomaji("Sono iikata wa shitsurei ni kikoeru yo. Ki o tsukeyou.");
+            }
+        }
         return node;
     }
 

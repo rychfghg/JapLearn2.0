@@ -182,7 +182,7 @@ public class ReplyCoachController {
         record.setCulturalNote(choice.getCulturalNote());
         record.setBestResponse(node.getChoices().stream()
                 .filter(item -> "BEST".equalsIgnoreCase(item.getEvaluation()))
-                .map(item -> item.getJapanese() + " — " + item.getText())
+                .map(item -> item.getJapanese() + " · " + item.getRomaji())
                 .findFirst()
                 .orElse(""));
         attempt.getAnswers().add(record);
