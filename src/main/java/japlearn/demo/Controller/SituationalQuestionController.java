@@ -30,8 +30,10 @@ import com.mongodb.client.gridfs.model.GridFSFile;
 
 import japlearn.demo.Entity.SituationalAttempt;
 import japlearn.demo.Entity.SituationalQuestion;
+import japlearn.demo.Entity.SituationalRun;
 import japlearn.demo.Repository.SituationalAttemptRepository;
 import japlearn.demo.Repository.SituationalQuestionRepository;
+import japlearn.demo.Repository.SituationalRunRepository;
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -39,15 +41,18 @@ import japlearn.demo.Repository.SituationalQuestionRepository;
 public class SituationalQuestionController {
     private final SituationalQuestionRepository questions;
     private final SituationalAttemptRepository attempts;
+    private final SituationalRunRepository runs;
     private final GridFsTemplate gridFsTemplate;
     private final GridFsOperations gridFsOperations;
 
     public SituationalQuestionController(SituationalQuestionRepository questions,
             SituationalAttemptRepository attempts,
+            SituationalRunRepository runs,
             GridFsTemplate gridFsTemplate,
             GridFsOperations gridFsOperations) {
         this.questions = questions;
         this.attempts = attempts;
+        this.runs = runs;
         this.gridFsTemplate = gridFsTemplate;
         this.gridFsOperations = gridFsOperations;
     }
@@ -139,6 +144,35 @@ public class SituationalQuestionController {
             @RequestParam(defaultValue = "RECOGNITION") String gameType) {
         return attempts.findTopByEmailIgnoreCaseAndGameTypeIgnoreCaseOrderByScoreDesc(email, gameType)
                 .map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/runs/current")
+    public ResponseEntity<SituationalRun> getCurrentRun(
+            @RequestParam String email,
+            @RequestParam(defaultValue = "RECOGNITION") String gameType) {
+        return runs.findByEmailIgnoreCaseAndGameTypeIgnoreCase(email, gameType)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @PutMapping("/runs/current")
+    public ResponseEntity<SituationalRun> saveCurrentRun(@RequestBody SituationalRun run) {
+        if (run.getEmail() == null || run.getEmail().isBlank()
+                || run.getGameType() == null || run.getGameType().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        runs.findByEmailIgnoreCaseAndGameTypeIgnoreCase(run.getEmail(), run.getGameType())
+                .ifPresent(existing -> run.setId(existing.getId()));
+        run.setUpdatedAt(Instant.now());
+        return ResponseEntity.ok(runs.save(run));
+    }
+
+    @DeleteMapping("/runs/current")
+    public ResponseEntity<Void> clearCurrentRun(
+            @RequestParam String email,
+            @RequestParam(defaultValue = "RECOGNITION") String gameType) {
+        runs.deleteByEmailIgnoreCaseAndGameTypeIgnoreCase(email, gameType);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/expression-match/progress")
