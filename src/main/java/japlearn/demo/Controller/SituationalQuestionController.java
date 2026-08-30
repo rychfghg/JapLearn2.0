@@ -1,11 +1,18 @@
 package japlearn.demo.Controller;
 
 import java.time.Instant;
+import java.io.IOException;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.data.mongodb.gridfs.GridFsOperations;
+import org.springframework.data.mongodb.gridfs.GridFsTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +23,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.mongodb.client.gridfs.model.GridFSFile;
 
 import japlearn.demo.Entity.SituationalAttempt;
 import japlearn.demo.Entity.SituationalQuestion;
@@ -28,11 +39,44 @@ import japlearn.demo.Repository.SituationalQuestionRepository;
 public class SituationalQuestionController {
     private final SituationalQuestionRepository questions;
     private final SituationalAttemptRepository attempts;
+    private final GridFsTemplate gridFsTemplate;
+    private final GridFsOperations gridFsOperations;
 
     public SituationalQuestionController(SituationalQuestionRepository questions,
-            SituationalAttemptRepository attempts) {
+            SituationalAttemptRepository attempts,
+            GridFsTemplate gridFsTemplate,
+            GridFsOperations gridFsOperations) {
         this.questions = questions;
         this.attempts = attempts;
+        this.gridFsTemplate = gridFsTemplate;
+        this.gridFsOperations = gridFsOperations;
+    }
+
+    @PostMapping(value = "/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, String>> uploadMedia(@RequestPart("file") MultipartFile file)
+            throws IOException {
+        String contentType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
+        if (!contentType.startsWith("image/") && !contentType.startsWith("audio/")) {
+            return ResponseEntity.badRequest().build();
+        }
+        Object id = gridFsTemplate.store(file.getInputStream(), file.getOriginalFilename(), contentType);
+        return ResponseEntity.ok(Map.of(
+                "url", "/api/situational/media/" + id,
+                "contentType", contentType));
+    }
+
+    @GetMapping("/media/{id}")
+    public ResponseEntity<byte[]> getMedia(@PathVariable String id) throws IOException {
+        GridFSFile file = gridFsTemplate.findOne(Query.query(Criteria.where("_id").is(id)));
+        if (file == null) return ResponseEntity.notFound().build();
+        var resource = gridFsOperations.getResource(file);
+        String contentType = resource.getContentType() == null
+                ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+                : resource.getContentType();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .cacheControl(CacheControl.noCache())
+                .body(resource.getInputStream().readAllBytes());
     }
 
     @GetMapping("/questions")
