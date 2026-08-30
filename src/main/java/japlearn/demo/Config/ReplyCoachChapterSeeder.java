@@ -42,7 +42,8 @@ public class ReplyCoachChapterSeeder {
             ReplyCoachChapter chapter = repository
                     .findByTitleIgnoreCase("A Day of First Impressions")
                     .orElseGet(ReplyCoachChapter::new);
-            boolean currentStoryVersion = chapter.getNodes() != null
+            boolean currentStoryVersion = chapter.getStoryVersion() >= 2
+                    && chapter.getNodes() != null
                     && chapter.getNodes().stream()
                             .anyMatch(node -> "dialogue-1-companion".equals(node.getId()));
             if (currentStoryVersion) return;
@@ -57,6 +58,11 @@ public class ReplyCoachChapterSeeder {
                     "Recognize awkward, impolite, and offensive responses"));
             chapter.setStatus("PUBLISHED");
             chapter.setCoverKey("station");
+            chapter.setBgmEnabled(true);
+            chapter.setBgmUrl("bundled:calm");
+            chapter.setBgmVolume(0.1);
+            chapter.setBgmFadeMs(800);
+            chapter.setStoryVersion(2);
             chapter.setOrder(1);
             chapter.setStartNodeId("opening");
 
@@ -84,7 +90,7 @@ public class ReplyCoachChapterSeeder {
                         "scene-" + number,
                         "NARRATION",
                         encounter.location(),
-                        encounter.narration(),
+                        sceneNarration(number, encounter),
                         encounter.background(),
                         dialogueId,
                         false));
@@ -104,6 +110,8 @@ public class ReplyCoachChapterSeeder {
                 dialogue.setExpressionKey("SPEAKING");
                 dialogue.setSecondaryCharacterKey("Sumi".equals(encounter.speaker()) ? "HARU" : "SUMI");
                 dialogue.setSecondaryExpressionKey("NEUTRAL");
+                dialogue.setCharacterPosition(number % 2 == 0 ? "CENTER_LEFT" : "CENTER_RIGHT");
+                dialogue.setSecondaryCharacterPosition(number % 2 == 0 ? "CENTER_RIGHT" : "CENTER_LEFT");
                 nodes.add(dialogue);
 
                 String companionKey = "Sumi".equals(encounter.speaker()) ? "HARU" : "SUMI";
@@ -128,6 +136,8 @@ public class ReplyCoachChapterSeeder {
                 companionDialogue.setSecondaryCharacterKey(
                         "SUMI".equals(companionKey) ? "HARU" : "SUMI");
                 companionDialogue.setSecondaryExpressionKey("NEUTRAL");
+                companionDialogue.setCharacterPosition(number % 2 == 0 ? "CENTER_RIGHT" : "CENTER_LEFT");
+                companionDialogue.setSecondaryCharacterPosition(number % 2 == 0 ? "CENTER_LEFT" : "CENTER_RIGHT");
                 nodes.add(companionDialogue);
 
                 ReplyCoachChapter.StoryNode choice = node(
@@ -141,6 +151,11 @@ public class ReplyCoachChapterSeeder {
                 choice.setCharacterKey("Sumi".equals(encounter.speaker()) ? "SUMI" : "HARU");
                 choice.setExpressionKey("NEUTRAL");
                 choice.setSecondaryCharacterKey("Sumi".equals(encounter.speaker()) ? "HARU" : "SUMI");
+                choice.setSecondaryExpressionKey("NEUTRAL");
+                choice.setCharacterPosition("CENTER_RIGHT");
+                choice.setSecondaryCharacterPosition("CENTER_LEFT");
+                choice.setHint(decisionHint(number));
+                choice.setHintPenalty(0);
                 choice.setShuffleChoices(true);
 
                 List<ReplyCoachChapter.ChoiceOption> options = new ArrayList<>(List.of(
@@ -165,10 +180,10 @@ public class ReplyCoachChapterSeeder {
                 choice.setChoices(options);
                 nodes.add(choice);
 
-                nodes.add(reaction("reaction-" + number + "-best", "SUMI", "CORRECT", options, number + "-best", encounter.background(), mergeId));
-                nodes.add(reaction("reaction-" + number + "-acceptable", "HARU", "NEUTRAL", options, number + "-acceptable", encounter.background(), mergeId));
-                nodes.add(reaction("reaction-" + number + "-awkward", "SUMI", "WRONG", options, number + "-awkward", encounter.background(), mergeId));
-                nodes.add(reaction("reaction-" + number + "-rude", "HARU", "WRONG", options, number + "-rude", encounter.background(), mergeId));
+                nodes.add(reaction("reaction-" + number + "-best", "SUMI", "HAPPY", options, number + "-best", encounter.background(), mergeId));
+                nodes.add(reaction("reaction-" + number + "-acceptable", "HARU", "SERIOUS", options, number + "-acceptable", encounter.background(), mergeId));
+                nodes.add(reaction("reaction-" + number + "-awkward", "SUMI", "CONFUSED", options, number + "-awkward", encounter.background(), mergeId));
+                nodes.add(reaction("reaction-" + number + "-rude", "HARU", number % 3 == 0 ? "ANGRY" : "SURPRISED", options, number + "-rude", encounter.background(), mergeId));
 
                 ReplyCoachChapter.StoryNode merge = node(
                         mergeId,
@@ -185,6 +200,8 @@ public class ReplyCoachChapterSeeder {
                 merge.setExpressionKey("SMILE");
                 merge.setSecondaryCharacterKey("HARU");
                 merge.setSecondaryExpressionKey("SMILE");
+                merge.setCharacterPosition(number % 2 == 0 ? "CENTER_LEFT" : "CENTER_RIGHT");
+                merge.setSecondaryCharacterPosition(number % 2 == 0 ? "CENTER_RIGHT" : "CENTER_LEFT");
                 if (number % 4 != 0) {
                     merge.setJapanese(number % 2 == 0
                             ? "うん、覚えておこう。次へ行こう！"
@@ -265,7 +282,40 @@ public class ReplyCoachChapterSeeder {
         node.setBackgroundKey(background);
         node.setNextNodeId(next);
         node.setSpritesVisible(spritesVisible);
+        node.setBgmEnabled(true);
+        node.setBgmUrl(switch (background) {
+            case "train", "shop" -> "bundled:busy";
+            case "station-night" -> "bundled:ending";
+            default -> "bundled:calm";
+        });
+        node.setBgmVolume("station-night".equals(background) ? 0.08 : 0.1);
+        node.setBgmFadeMs(700);
         return node;
+    }
+
+    private String sceneNarration(int number, Encounter encounter) {
+        String transition = switch (number) {
+            case 1 -> "Just after eight in the morning, the city is already moving around you. ";
+            case 3 -> "A few minutes later, the three of you reach the platform as another wave of commuters gathers beside the marked lines. ";
+            case 8 -> "By lunchtime, the crowded streets give way to the warm entrance of a neighborhood restaurant. ";
+            case 14 -> "In the afternoon, your journey becomes more personal when your companions bring you to a host family's home. ";
+            case 20 -> "Night settles over Tokyo as the three of you return to the station where the day began. ";
+            default -> "As the day continues, the next social moment arrives naturally. ";
+        };
+        return transition + encounter.narration()
+                + " Sumi and Haru pause long enough for you to notice how the setting and relationship shape what happens next.";
+    }
+
+    private String decisionHint(int number) {
+        return switch (number) {
+            case 1, 20 -> "These are close friends. Look for a response that feels warm and natural rather than distant or demanding.";
+            case 2, 7, 13, 19 -> "You are speaking to someone you do not know well. Begin respectfully and avoid commands.";
+            case 3, 4 -> "Public transportation depends on consideration for the people around you. Choose the least disruptive action.";
+            case 5 -> "The location is culturally important. Think about the small gesture visitors use to show respect.";
+            case 8, 9, 10, 11, 12 -> "You are in a restaurant. Notice whether the moment happens before, during, or after the meal.";
+            case 14, 15, 16, 17 -> "You are a guest in someone else's home. Choose language and behavior that acknowledges the host's space and effort.";
+            default -> "Pay attention to age, status, setting, and how directly the response addresses the other person.";
+        };
     }
 
     private ReplyCoachChapter.StoryNode reaction(String id, String character, String expression,
@@ -281,20 +331,24 @@ public class ReplyCoachChapterSeeder {
         node.setSecondaryExpressionKey("NEUTRAL");
         switch (option.getEvaluation()) {
             case "BEST" -> {
-                node.setJapanese("うん、とても自然でいい答えだね！");
-                node.setRomaji("Un, totemo shizen de ii kotae da ne!");
+                node.setJapanese("そうそう！今の返事なら、相手も安心すると思うよ。");
+                node.setRomaji("Sou sou! Ima no henji nara, aite mo anshin suru to omou yo.");
             }
             case "ACCEPTABLE" -> {
-                node.setJapanese("通じるけど、もう少し自然に言えるよ。");
-                node.setRomaji("Tsujiru kedo, mou sukoshi shizen ni ieru yo.");
+                node.setJapanese("うん、意味は伝わるよ。でも、もう少し自然な言い方もあるかな。");
+                node.setRomaji("Un, imi wa tsutawaru yo. Demo, mou sukoshi shizen na iikata mo aru kana.");
             }
             case "AWKWARD" -> {
-                node.setJapanese("ちょっと不自然に聞こえるかもしれないね。");
-                node.setRomaji("Chotto fushizen ni kikoeru kamo shirenai ne.");
+                node.setJapanese("え？……ああ、なるほど。意味はわかるけど、ここでは少し不自然かも。");
+                node.setRomaji("E? ...Aa, naruhodo. Imi wa wakaru kedo, koko de wa sukoshi fushizen kamo.");
+            }
+            case "IMPOLITE" -> {
+                node.setJapanese("……え？ちょっと待って。その言い方は、この相手には失礼に聞こえるかも。");
+                node.setRomaji("...E? Chotto matte. Sono iikata wa, kono aite ni wa shitsurei ni kikoeru kamo.");
             }
             default -> {
-                node.setJapanese("その言い方は失礼に聞こえるよ。気をつけよう。");
-                node.setRomaji("Sono iikata wa shitsurei ni kikoeru yo. Ki o tsukeyou.");
+                node.setJapanese("それは……ちょっと。今の言い方はかなり強く聞こえるよ。言い直してみよう。");
+                node.setRomaji("Sore wa... chotto. Ima no iikata wa kanari tsuyoku kikoeru yo. Iinaoshite miyou.");
             }
         }
         return node;

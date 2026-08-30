@@ -11,6 +11,13 @@ import java.util.Map;
 import java.util.Set;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.gridfs.GridFsOperations;
+import org.springframework.data.mongodb.gridfs.GridFsResource;
+import org.springframework.data.mongodb.gridfs.GridFsTemplate;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +28,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.mongodb.client.gridfs.model.GridFSFile;
 
 import japlearn.demo.Entity.ReplyCoachAttempt;
 import japlearn.demo.Entity.ReplyCoachChapter;
@@ -33,12 +44,57 @@ import japlearn.demo.Repository.ReplyCoachChapterRepository;
 public class ReplyCoachController {
     private final ReplyCoachChapterRepository chapters;
     private final ReplyCoachAttemptRepository attempts;
+    private final GridFsTemplate gridFsTemplate;
+    private final GridFsOperations gridFsOperations;
 
     public ReplyCoachController(
             ReplyCoachChapterRepository chapters,
-            ReplyCoachAttemptRepository attempts) {
+            ReplyCoachAttemptRepository attempts,
+            GridFsTemplate gridFsTemplate,
+            GridFsOperations gridFsOperations) {
         this.chapters = chapters;
         this.attempts = attempts;
+        this.gridFsTemplate = gridFsTemplate;
+        this.gridFsOperations = gridFsOperations;
+    }
+
+    @PostMapping(value = "/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadMedia(@RequestPart("file") MultipartFile file) {
+        try {
+            String contentType = file.getContentType() == null
+                    ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+                    : file.getContentType();
+            if (!contentType.startsWith("audio/")) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Reply Coach BGM must be an audio file."));
+            }
+            Object id = gridFsTemplate.store(
+                    file.getInputStream(),
+                    file.getOriginalFilename(),
+                    contentType);
+            return ResponseEntity.ok(Map.of(
+                    "id", id.toString(),
+                    "url", "/api/reply-coach/media/" + id));
+        } catch (Exception error) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "BGM upload failed."));
+        }
+    }
+
+    @GetMapping("/media/{id}")
+    public ResponseEntity<byte[]> media(@PathVariable String id) {
+        try {
+            GridFSFile file = gridFsTemplate.findOne(new Query(Criteria.where("_id").is(id)));
+            if (file == null) return ResponseEntity.notFound().build();
+            GridFsResource resource = gridFsOperations.getResource(file);
+            String contentType = resource.getContentType() == null
+                    ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+                    : resource.getContentType();
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_TYPE, contentType)
+                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000, immutable")
+                    .body(resource.getInputStream().readAllBytes());
+        } catch (Exception error) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/chapters")
@@ -177,7 +233,9 @@ public class ReplyCoachController {
         record.setSelectedText(choice.getText());
         record.setSelectedJapanese(choice.getJapanese());
         record.setEvaluation(choice.getEvaluation());
-        record.setPoints(choice.getPoints());
+        boolean hintUsed = Boolean.parseBoolean(request.getOrDefault("hintUsed", "false"));
+        int earnedPoints = Math.max(0, choice.getPoints() - (hintUsed ? node.getHintPenalty() : 0));
+        record.setPoints(earnedPoints);
         record.setExplanation(choice.getExplanation());
         record.setCulturalNote(choice.getCulturalNote());
         record.setBestResponse(node.getChoices().stream()
@@ -186,7 +244,7 @@ public class ReplyCoachController {
                 .findFirst()
                 .orElse(""));
         attempt.getAnswers().add(record);
-        attempt.setScore(attempt.getScore() + choice.getPoints());
+        attempt.setScore(attempt.getScore() + earnedPoints);
         increment(attempt, choice.getEvaluation());
         attempt.setCurrentNodeId(choice.getNextNodeId());
         attempt.setUpdatedAt(Instant.now());

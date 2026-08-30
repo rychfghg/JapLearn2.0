@@ -18,6 +18,11 @@ public class ReplyCoachChapter {
     private String status = "DRAFT";
     private String startNodeId;
     private String coverKey;
+    private String bgmUrl;
+    private boolean bgmEnabled = true;
+    private double bgmVolume = 0.12;
+    private int bgmFadeMs = 700;
+    private int storyVersion = 2;
     private int order;
     private List<StoryNode> nodes = new ArrayList<>();
     private Instant createdAt = Instant.now();
@@ -37,6 +42,14 @@ public class ReplyCoachChapter {
         private String secondaryExpressionKey;
         private String backgroundKey;
         private String audioUrl;
+        private String bgmUrl;
+        private Boolean bgmEnabled;
+        private Double bgmVolume;
+        private Integer bgmFadeMs;
+        private String hint;
+        private int hintPenalty;
+        private String characterPosition = "CENTER_RIGHT";
+        private String secondaryCharacterPosition = "CENTER_LEFT";
         private boolean spritesVisible = true;
         private boolean tapToContinue = true;
         private boolean shuffleChoices;
@@ -69,6 +82,22 @@ public class ReplyCoachChapter {
         public void setBackgroundKey(String backgroundKey) { this.backgroundKey = backgroundKey; }
         public String getAudioUrl() { return audioUrl; }
         public void setAudioUrl(String audioUrl) { this.audioUrl = audioUrl; }
+        public String getBgmUrl() { return bgmUrl; }
+        public void setBgmUrl(String bgmUrl) { this.bgmUrl = bgmUrl; }
+        public Boolean getBgmEnabled() { return bgmEnabled; }
+        public void setBgmEnabled(Boolean bgmEnabled) { this.bgmEnabled = bgmEnabled; }
+        public Double getBgmVolume() { return bgmVolume; }
+        public void setBgmVolume(Double bgmVolume) { this.bgmVolume = bgmVolume; }
+        public Integer getBgmFadeMs() { return bgmFadeMs; }
+        public void setBgmFadeMs(Integer bgmFadeMs) { this.bgmFadeMs = bgmFadeMs; }
+        public String getHint() { return hint; }
+        public void setHint(String hint) { this.hint = hint; }
+        public int getHintPenalty() { return hintPenalty; }
+        public void setHintPenalty(int hintPenalty) { this.hintPenalty = hintPenalty; }
+        public String getCharacterPosition() { return characterPosition; }
+        public void setCharacterPosition(String characterPosition) { this.characterPosition = characterPosition; }
+        public String getSecondaryCharacterPosition() { return secondaryCharacterPosition; }
+        public void setSecondaryCharacterPosition(String secondaryCharacterPosition) { this.secondaryCharacterPosition = secondaryCharacterPosition; }
         public boolean isSpritesVisible() { return spritesVisible; }
         public void setSpritesVisible(boolean spritesVisible) { this.spritesVisible = spritesVisible; }
         public boolean isTapToContinue() { return tapToContinue; }
@@ -137,6 +166,16 @@ public class ReplyCoachChapter {
     public void setStartNodeId(String startNodeId) { this.startNodeId = startNodeId; }
     public String getCoverKey() { return coverKey; }
     public void setCoverKey(String coverKey) { this.coverKey = coverKey; }
+    public String getBgmUrl() { return bgmUrl; }
+    public void setBgmUrl(String bgmUrl) { this.bgmUrl = bgmUrl; }
+    public boolean isBgmEnabled() { return bgmEnabled; }
+    public void setBgmEnabled(boolean bgmEnabled) { this.bgmEnabled = bgmEnabled; }
+    public double getBgmVolume() { return bgmVolume; }
+    public void setBgmVolume(double bgmVolume) { this.bgmVolume = bgmVolume; }
+    public int getBgmFadeMs() { return bgmFadeMs; }
+    public void setBgmFadeMs(int bgmFadeMs) { this.bgmFadeMs = bgmFadeMs; }
+    public int getStoryVersion() { return storyVersion; }
+    public void setStoryVersion(int storyVersion) { this.storyVersion = storyVersion; }
     public int getOrder() { return order; }
     public void setOrder(int order) { this.order = order; }
     public List<StoryNode> getNodes() { return nodes; }
