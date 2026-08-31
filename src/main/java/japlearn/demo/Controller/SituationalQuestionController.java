@@ -212,7 +212,13 @@ public class SituationalQuestionController {
         result.put("highestCompletedLevel", highestCompletedLevel);
         result.put("completedSets", completedSets);
         result.put("bestScore", records.stream().mapToInt(SituationalAttempt::getScore).max().orElse(0));
+        result.put("bestAccuracy", round(records.stream().mapToDouble(SituationalAttempt::getAccuracy).max().orElse(0)));
+        result.put("averageAccuracy", round(records.stream().mapToDouble(SituationalAttempt::getAccuracy).average().orElse(0)));
         result.put("attempts", records.size());
         return result;
+    }
+
+    private int round(double value) {
+        return (int) Math.round(value);
     }
 }
