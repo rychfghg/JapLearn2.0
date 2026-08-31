@@ -17,6 +17,7 @@ public class SituationalQuestion {
     private String sceneKey;
     private String imageUrl;
     private String imageAlt;
+    private String audioUrl;
     private String scenario;
     private String hint;
     private List<ResponseChoice> choices = new ArrayList<>();
@@ -43,6 +44,8 @@ public class SituationalQuestion {
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public String getImageAlt() { return imageAlt; }
     public void setImageAlt(String imageAlt) { this.imageAlt = imageAlt; }
+    public String getAudioUrl() { return audioUrl; }
+    public void setAudioUrl(String audioUrl) { this.audioUrl = audioUrl; }
     public String getScenario() { return scenario; }
     public void setScenario(String scenario) { this.scenario = scenario; }
     public String getHint() { return hint; }
