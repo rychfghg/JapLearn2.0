@@ -14,6 +14,7 @@ public class SituationalAttempt {
     private String gameType;
     private String difficulty;
     private int score;
+    private int maxScore;
     private int totalQuestions;
     private int correctAnswers;
     private int wrongAnswers;
@@ -36,6 +37,8 @@ public class SituationalAttempt {
     public void setDifficulty(String difficulty) { this.difficulty = difficulty; }
     public int getScore() { return score; }
     public void setScore(int score) { this.score = score; }
+    public int getMaxScore() { return maxScore; }
+    public void setMaxScore(int maxScore) { this.maxScore = maxScore; }
     public int getTotalQuestions() { return totalQuestions; }
     public void setTotalQuestions(int totalQuestions) { this.totalQuestions = totalQuestions; }
     public int getCorrectAnswers() { return correctAnswers; }

@@ -3,6 +3,7 @@ package japlearn.demo.Controller;
 import java.time.Instant;
 import java.io.IOException;
 import java.util.List;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -125,6 +126,7 @@ public class SituationalQuestionController {
         attempt.setWrongAnswers(Math.max(0, attempt.getTotalQuestions() - attempt.getCorrectAnswers()));
         attempt.setAccuracy(attempt.getTotalQuestions() == 0 ? 0
                 : Math.round((attempt.getCorrectAnswers() * 10000.0) / attempt.getTotalQuestions()) / 100.0);
+        normalizeRecognitionScore(attempt);
         return ResponseEntity.ok(attempts.save(attempt));
     }
 
@@ -135,15 +137,31 @@ public class SituationalQuestionController {
         List<SituationalAttempt> result = email == null || email.isBlank()
                 ? attempts.findAll()
                 : attempts.findByEmailIgnoreCaseOrderByCompletedAtDesc(email);
-        return gameType == null || gameType.isBlank() ? result : result.stream()
-                .filter(item -> gameType.equalsIgnoreCase(item.getGameType())).toList();
+        return (gameType == null || gameType.isBlank() ? result : result.stream()
+                .filter(item -> gameType.equalsIgnoreCase(item.getGameType())).toList()).stream()
+                .map(this::normalizeRecognitionScore)
+                .toList();
     }
 
     @GetMapping("/best")
     public ResponseEntity<SituationalAttempt> getBest(@RequestParam String email,
             @RequestParam(defaultValue = "RECOGNITION") String gameType) {
-        return attempts.findTopByEmailIgnoreCaseAndGameTypeIgnoreCaseOrderByScoreDesc(email, gameType)
-                .map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
+        return attempts.findByEmailIgnoreCaseOrderByCompletedAtDesc(email).stream()
+                .filter(item -> gameType.equalsIgnoreCase(item.getGameType()))
+                .map(this::normalizeRecognitionScore)
+                .max(Comparator.comparingInt(SituationalAttempt::getScore))
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    private SituationalAttempt normalizeRecognitionScore(SituationalAttempt attempt) {
+        if ("RECOGNITION".equalsIgnoreCase(attempt.getGameType())) {
+            attempt.setScore(attempt.getCorrectAnswers() * 10);
+            attempt.setMaxScore(attempt.getTotalQuestions() * 10);
+        } else if (attempt.getMaxScore() <= 0 && attempt.getTotalQuestions() > 0) {
+            attempt.setMaxScore(attempt.getTotalQuestions() * 10);
+        }
+        return attempt;
     }
 
     @GetMapping("/runs/current")
