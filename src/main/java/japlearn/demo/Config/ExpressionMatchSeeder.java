@@ -12,6 +12,9 @@ import japlearn.demo.Repository.SituationalQuestionRepository;
 
 @Component
 public class ExpressionMatchSeeder implements CommandLineRunner {
+    private static final String FIRST_IMAGE_URL = "/expression-match/gesture-wave.png";
+    private static final String SECOND_IMAGE_URL = "/expression-match/gesture-bow.png";
+
     private final SituationalQuestionRepository repository;
 
     public ExpressionMatchSeeder(SituationalQuestionRepository repository) {
@@ -114,6 +117,16 @@ public class ExpressionMatchSeeder implements CommandLineRunner {
         existing.forEach(question -> {
             boolean changed = false;
 
+            if (question.getImageUrl() == null || question.getImageUrl().isBlank()) {
+                question.setImageUrl(FIRST_IMAGE_URL);
+                changed = true;
+            }
+            if (question.getSecondaryImageUrl() == null
+                    || question.getSecondaryImageUrl().isBlank()) {
+                question.setSecondaryImageUrl(SECOND_IMAGE_URL);
+                changed = true;
+            }
+
             if ("Everyday gestures".equals(question.getTopic())) {
                 question.setTopic("Everyday situations");
                 question.setLocation("Everyday situations");
@@ -157,6 +170,8 @@ public class ExpressionMatchSeeder implements CommandLineRunner {
             question.setSceneKey("expression-match-" + difficulty.toLowerCase() + "-" + (index + 1));
             question.setScenario(moment.scene());
             question.setSecondaryScenario(moment.opposite());
+            question.setImageUrl(FIRST_IMAGE_URL);
+            question.setSecondaryImageUrl(SECOND_IMAGE_URL);
             question.setImageAlt("Scene for: " + moment.scene());
             question.setSecondaryImageAlt("Scene for: " + moment.opposite());
             question.setHint(moment.hint());
