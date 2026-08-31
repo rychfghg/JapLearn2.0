@@ -17,8 +17,11 @@ public class SituationalQuestion {
     private String sceneKey;
     private String imageUrl;
     private String imageAlt;
+    private String secondaryImageUrl;
+    private String secondaryImageAlt;
     private String audioUrl;
     private String scenario;
+    private String secondaryScenario;
     private String hint;
     private List<ResponseChoice> choices = new ArrayList<>();
     private String correctAnswer;
@@ -44,10 +47,16 @@ public class SituationalQuestion {
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public String getImageAlt() { return imageAlt; }
     public void setImageAlt(String imageAlt) { this.imageAlt = imageAlt; }
+    public String getSecondaryImageUrl() { return secondaryImageUrl; }
+    public void setSecondaryImageUrl(String secondaryImageUrl) { this.secondaryImageUrl = secondaryImageUrl; }
+    public String getSecondaryImageAlt() { return secondaryImageAlt; }
+    public void setSecondaryImageAlt(String secondaryImageAlt) { this.secondaryImageAlt = secondaryImageAlt; }
     public String getAudioUrl() { return audioUrl; }
     public void setAudioUrl(String audioUrl) { this.audioUrl = audioUrl; }
     public String getScenario() { return scenario; }
     public void setScenario(String scenario) { this.scenario = scenario; }
+    public String getSecondaryScenario() { return secondaryScenario; }
+    public void setSecondaryScenario(String secondaryScenario) { this.secondaryScenario = secondaryScenario; }
     public String getHint() { return hint; }
     public void setHint(String hint) { this.hint = hint; }
     public List<ResponseChoice> getChoices() { return choices; }

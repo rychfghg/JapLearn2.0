@@ -200,15 +200,15 @@ public class SituationalQuestionController {
         List<String> completedSets = records.stream().filter(SituationalAttempt::isCompleted)
                 .map(item -> item.getLevel() + "-" + item.getSetNumber()).distinct().toList();
         int highestCompletedLevel = 0;
-        int[] requiredSets = {0, 3, 3, 3, 5, 10};
-        for (int level = 1; level <= 5; level++) {
+        int[] requiredSets = {0, 1, 1, 1};
+        for (int level = 1; level <= 3; level++) {
             final int currentLevel = level;
             long cleared = completedSets.stream().filter(key -> key.startsWith(currentLevel + "-")).count();
             if (cleared < requiredSets[level]) break;
             highestCompletedLevel = level;
         }
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("unlockedLevel", Math.min(5, Math.max(1, highestCompletedLevel + 1)));
+        result.put("unlockedLevel", Math.min(3, Math.max(1, highestCompletedLevel + 1)));
         result.put("highestCompletedLevel", highestCompletedLevel);
         result.put("completedSets", completedSets);
         result.put("bestScore", records.stream().mapToInt(SituationalAttempt::getScore).max().orElse(0));

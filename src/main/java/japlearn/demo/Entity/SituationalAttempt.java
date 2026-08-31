@@ -19,6 +19,7 @@ public class SituationalAttempt {
     private int correctAnswers;
     private int wrongAnswers;
     private double accuracy;
+    private int stars;
     private boolean completed;
     private int level;
     private int setNumber;
@@ -47,6 +48,8 @@ public class SituationalAttempt {
     public void setWrongAnswers(int wrongAnswers) { this.wrongAnswers = wrongAnswers; }
     public double getAccuracy() { return accuracy; }
     public void setAccuracy(double accuracy) { this.accuracy = accuracy; }
+    public int getStars() { return stars; }
+    public void setStars(int stars) { this.stars = stars; }
     public boolean isCompleted() { return completed; }
     public void setCompleted(boolean completed) { this.completed = completed; }
     public int getLevel() { return level; }
