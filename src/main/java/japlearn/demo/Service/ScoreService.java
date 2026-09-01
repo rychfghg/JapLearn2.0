@@ -22,12 +22,10 @@ public class ScoreService {
     }
 
     public Score saveHighScore(Score attempt) {
-        Optional<Score> current = scoreRepository.findTopByEmailAndGameOrderByScoreDesc(
-                attempt.getEmail(), attempt.getGame());
-        if (current.isPresent() && current.get().getScore() >= attempt.getScore()) {
-            return current.get();
-        }
-        current.ifPresent(score -> attempt.setId(score.getId()));
+        // Keep every completed run for averages, completion history, weak-area
+        // analysis, and teacher reports. getHighScore still derives the personal
+        // best using the repository's score-descending query.
+        attempt.setId(null);
         return scoreRepository.save(attempt);
     }
 

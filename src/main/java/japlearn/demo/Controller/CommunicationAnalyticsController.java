@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
 import japlearn.demo.Entity.SituationalAttempt;
 import japlearn.demo.Entity.QuackTalkSession;
 import japlearn.demo.Entity.ReplyCoachAttempt;
+import japlearn.demo.Entity.Score;
 import japlearn.demo.Repository.ReplyCoachAttemptRepository;
 import japlearn.demo.Repository.QuackTalkSessionRepository;
 import japlearn.demo.Repository.SituationalAttemptRepository;
+import japlearn.demo.Repository.ScoreRepository;
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -25,14 +27,17 @@ public class CommunicationAnalyticsController {
     private final SituationalAttemptRepository attempts;
     private final QuackTalkSessionRepository talkSessions;
     private final ReplyCoachAttemptRepository replyCoachAttempts;
+    private final ScoreRepository scores;
 
     public CommunicationAnalyticsController(
             SituationalAttemptRepository attempts,
             QuackTalkSessionRepository talkSessions,
-            ReplyCoachAttemptRepository replyCoachAttempts) {
+            ReplyCoachAttemptRepository replyCoachAttempts,
+            ScoreRepository scores) {
         this.attempts = attempts;
         this.talkSessions = talkSessions;
         this.replyCoachAttempts = replyCoachAttempts;
+        this.scores = scores;
     }
 
     @GetMapping("/getStudentAnalytics")
@@ -43,6 +48,7 @@ public class CommunicationAnalyticsController {
                 .findByEmailIgnoreCaseOrderByPracticedAtDesc(email);
         List<ReplyCoachAttempt> replyCoachRecords = replyCoachAttempts
                 .findByEmailIgnoreCaseAndStatusIgnoreCaseOrderByUpdatedAtDesc(email, "COMPLETED");
+        List<Score> arcadeRecords = scores.findByEmailIgnoreCaseOrderByDateDesc(email);
 
         double recognitionAccuracy = averageAccuracy(records, "RECOGNITION");
         double responseAccuracy = replyCoachRecords.stream()
@@ -86,7 +92,11 @@ public class CommunicationAnalyticsController {
         analytics.put("recognitionAccuracy", round(recognitionAccuracy));
         analytics.put("expressionMatchAccuracy", round(expressionAccuracy));
         analytics.put("politenessAccuracy", round(politenessAccuracy));
-        analytics.put("completedActivities", records.size() + speakingRecords.size() + replyCoachRecords.size());
+        analytics.put("completedActivities", records.size() + speakingRecords.size() + replyCoachRecords.size() + arcadeRecords.size());
+        analytics.put("quackamoleAccuracy", arcadeAccuracy(arcadeRecords, "QUACKAMOLE"));
+        analytics.put("quackmanAccuracy", arcadeAccuracy(arcadeRecords, "QUACKMAN"));
+        analytics.put("quackslateAccuracy", arcadeAccuracy(arcadeRecords, "QUACKSLATE"));
+        analytics.put("arcadeCompletedActivities", arcadeRecords.stream().filter(Score::isCompleted).count());
         analytics.put("replyCoachCompletedChapters", replyCoachRecords.stream()
                 .map(ReplyCoachAttempt::getChapterId).distinct().count());
         analytics.put("replyCoachAttempts", replyCoachRecords.size());
@@ -124,5 +134,15 @@ public class CommunicationAnalyticsController {
                 .mapToInt(QuackTalkSession::getScore)
                 .average()
                 .orElse(0));
+    }
+
+    private int arcadeAccuracy(List<Score> records, String game) {
+        return records.stream().filter(record -> game.equalsIgnoreCase(record.getGame()))
+                .mapToInt(record -> record.getMaxScore() > 0
+                        ? (int) Math.round(record.getScore() * 100.0 / record.getMaxScore())
+                        : record.getTotalQuestions() > 0
+                                ? (int) Math.round(record.getCorrectAnswers() * 100.0 / record.getTotalQuestions())
+                                : Math.min(100, Math.max(0, record.getScore())))
+                .max().orElse(0);
     }
 }

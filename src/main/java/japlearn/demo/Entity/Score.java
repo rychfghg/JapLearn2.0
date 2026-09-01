@@ -13,6 +13,11 @@ public class Score {
     private String date;
     private String game;
     private int score;
+    private int maxScore;
+    private int correctAnswers;
+    private int totalQuestions;
+    private boolean completed = true;
+    private String mode;
 
     public Score() {
     }
@@ -68,4 +73,14 @@ public class Score {
     public void setScore(int score) {
         this.score = score;
     }
+    public int getMaxScore() { return maxScore; }
+    public void setMaxScore(int maxScore) { this.maxScore = maxScore; }
+    public int getCorrectAnswers() { return correctAnswers; }
+    public void setCorrectAnswers(int correctAnswers) { this.correctAnswers = correctAnswers; }
+    public int getTotalQuestions() { return totalQuestions; }
+    public void setTotalQuestions(int totalQuestions) { this.totalQuestions = totalQuestions; }
+    public boolean isCompleted() { return completed; }
+    public void setCompleted(boolean completed) { this.completed = completed; }
+    public String getMode() { return mode; }
+    public void setMode(String mode) { this.mode = mode; }
 }

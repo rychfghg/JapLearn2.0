@@ -20,6 +20,10 @@ public class SituationalQuestion {
     private String secondaryImageUrl;
     private String secondaryImageAlt;
     private String audioUrl;
+    private String speaker;
+    private String characterKey;
+    private String npcLine;
+    private String npcRomaji;
     private String scenario;
     private String secondaryScenario;
     private String hint;
@@ -53,6 +57,14 @@ public class SituationalQuestion {
     public void setSecondaryImageAlt(String secondaryImageAlt) { this.secondaryImageAlt = secondaryImageAlt; }
     public String getAudioUrl() { return audioUrl; }
     public void setAudioUrl(String audioUrl) { this.audioUrl = audioUrl; }
+    public String getSpeaker() { return speaker; }
+    public void setSpeaker(String speaker) { this.speaker = speaker; }
+    public String getCharacterKey() { return characterKey; }
+    public void setCharacterKey(String characterKey) { this.characterKey = characterKey; }
+    public String getNpcLine() { return npcLine; }
+    public void setNpcLine(String npcLine) { this.npcLine = npcLine; }
+    public String getNpcRomaji() { return npcRomaji; }
+    public void setNpcRomaji(String npcRomaji) { this.npcRomaji = npcRomaji; }
     public String getScenario() { return scenario; }
     public void setScenario(String scenario) { this.scenario = scenario; }
     public String getSecondaryScenario() { return secondaryScenario; }
