@@ -30,8 +30,8 @@ public class UserService {
     @Value("${app.backend-url}")
     private String appBackendUrl;
 
-    @Value("${app.frontend-url}")
-    private String appFrontendUrl;
+    @Value("${app.student-web-url}")
+    private String studentWebUrl;
 
     @Value("${app.mail.from-address}")
     private String mailFromAddress;
@@ -69,8 +69,7 @@ public class UserService {
 
     // Send reset password email
 private void sendPasswordResetEmail(String email, String token) {
-    // Change the reset URL to use localhost
-    String resetUrl = appFrontendUrl + "/ResetPassword?token=" + token;
+    String resetUrl = studentWebUrl + "/ResetPassword?token=" + token;
 
     MimeMessage mimeMessage = mailSender.createMimeMessage();
     try {
@@ -283,7 +282,7 @@ private void sendPasswordResetEmail(String email, String token) {
         
 
         private void sendConfirmationEmail(String email, String token) {
-            String confirmationUrl = appFrontendUrl + "/ConfirmEmail?token=" + token;
+            String confirmationUrl = studentWebUrl + "/ConfirmEmail?token=" + token;
         
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             try {
