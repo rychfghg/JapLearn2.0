@@ -22,7 +22,7 @@ services:
       - key: APP_BACKEND_URL
         sync: false
       - key: APP_FRONTEND_URL
-        sync: false
+        value: https://japlearn.com
       - key: SPRING_WEB_LOG_LEVEL
         value: INFO
       - key: TOMCAT_LOG_LEVEL
