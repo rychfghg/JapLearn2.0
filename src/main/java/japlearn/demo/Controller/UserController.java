@@ -9,7 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,11 +23,12 @@ import japlearn.demo.DTO.LoginRequest;
 import japlearn.demo.Entity.User;
 import japlearn.demo.Service.UserService;
 
+// CORS is now handled once, globally, in SecurityConfig's allow-listed
+// CorsConfigurationSource — the old @CrossOrigin(origins = "*") on this
+// controller let any website on the internet call these endpoints from a
+// browser; it has been removed in favor of that allow-list.
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins =  "*")
-
-
 public class UserController {
 
     private final UserService japlearnService;
@@ -58,13 +58,6 @@ public ResponseEntity<?> resetPassword(@RequestParam("token") String token, @Req
     } else {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "Invalid token"));
     }
-}
-
-
-    @GetMapping("/test")
-    public String test() {
-        System.out.println("Endpoint hit!");
-    return "This is a test endpoint";
 }
 
 
@@ -265,8 +258,18 @@ public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.singletonMap("error", "User not found"));
     } catch (BadCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "Invalid credentials"));
+    } catch (IllegalStateException ex) {
+        // Expected, user-facing account states ("Email not confirmed",
+        // "User not approved") — safe to surface, the frontend matches on
+        // this exact text. Not a security-relevant leak.
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Collections.singletonMap("error", ex.getMessage()));
     } catch (Exception e) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.singletonMap("error", e.getMessage()));
+        // Anything else is unexpected (DB hiccup, bug, etc.) — log it
+        // server-side only. Returning e.getMessage() here used to leak raw
+        // internal exception text (stack details, driver errors, etc.) back
+        // to the client, which is exactly the kind of thing worth hiding.
+        e.printStackTrace();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.singletonMap("error", "An unexpected error occurred. Please try again."));
     }
 }
 

@@ -1,9 +1,11 @@
 package japlearn.demo.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.Map;
 
@@ -27,6 +29,14 @@ import japlearn.demo.Repository.UserRepository;
 @Service
 public class UserService {
     private static final ZoneId JAPLEARN_TIME_ZONE = ZoneId.of("Asia/Manila");
+
+    // Only these roles may ever come out of self-service registration
+    // (/register and /register-teacher). Anything else in the request body —
+    // "admin" included — is downgraded to "student". This is what stops a
+    // client from POSTing {"role":"admin"} and handing themselves the keys.
+    private static final Set<String> ALLOWED_SELF_REGISTER_ROLES = Set.of("student", "teacher");
+
+    private static final int RESET_TOKEN_VALID_HOURS = 1;
     @Value("${app.backend-url}")
     private String appBackendUrl;
 
@@ -56,9 +66,13 @@ public class UserService {
             throw new UsernameNotFoundException("User not found");
         }
 
-        // Generate reset token
+        // Generate reset token. It used to never expire — resetTokenExpiry
+        // was set on the entity but nothing ever wrote or checked it, so a
+        // token leaked from an old email/log stayed valid forever. It now
+        // expires in RESET_TOKEN_VALID_HOURS.
         String resetToken = UUID.randomUUID().toString();
         user.setResetToken(resetToken);
+        user.setResetTokenExpiry(LocalDateTime.now(JAPLEARN_TIME_ZONE).plusHours(RESET_TOKEN_VALID_HOURS));
         userRepository.save(user);
 
         // Send reset email
@@ -101,8 +115,22 @@ private void sendPasswordResetEmail(String email, String token) {
 
     // Method to reset the password
     public String resetPassword(String token, String newPassword) {
+    if (token == null || token.isBlank() || newPassword == null || newPassword.length() < 6) {
+        return "invalid";
+    }
+
     User user = userRepository.findByResetToken(token);
     if (user == null) {
+        return "invalid";
+    }
+
+    LocalDateTime expiry = user.getResetTokenExpiry();
+    if (expiry == null || LocalDateTime.now(JAPLEARN_TIME_ZONE).isAfter(expiry)) {
+        // Token expired (or predates this check) — burn it either way so it
+        // can't be retried, and make the caller request a fresh one.
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
         return "invalid";
     }
 
@@ -110,6 +138,7 @@ private void sendPasswordResetEmail(String email, String token) {
     String encryptedPassword = passwordEncoder.encode(newPassword);
     user.setPassword(encryptedPassword);
     user.setResetToken(null); // Invalidate the token after reset
+    user.setResetTokenExpiry(null);
     userRepository.save(user);
 
     // If the user is also in the Student table, update the password there
@@ -254,25 +283,50 @@ private void sendPasswordResetEmail(String email, String token) {
 
         public String registerUser(User user) {
             try {
-                if (userRepository.findByEmail(user.getEmail()) != null) {
-                    return "duplicate"; 
+                if (user == null || user.getEmail() == null || user.getPassword() == null) {
+                    return "invalid";
                 }
-                
+
+                String email = user.getEmail().trim().toLowerCase();
+                if (email.isBlank() || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+                    return "invalid";
+                }
+                if (user.getPassword().length() < 6) {
+                    return "invalid";
+                }
+
+                if (userRepository.findByEmail(email) != null) {
+                    return "duplicate";
+                }
+
+                // --- Everything below this line is what actually closes the
+                // hole: the incoming User is bound straight from the request
+                // body by Jackson, so a client could previously send
+                // {"role":"admin","isApproved":true,"isEmailConfirmed":true, ...}
+                // and register a fully active admin account with no checks
+                // at all. Every security-relevant field is now forced here,
+                // regardless of what the request body contained. ---
+                String requestedRole = user.getRole() == null ? "student" : user.getRole().trim().toLowerCase();
+                user.setRole(ALLOWED_SELF_REGISTER_ROLES.contains(requestedRole) ? requestedRole : "student");
+                user.setId(null);
+                user.setEmail(email);
+                user.setApproved(false);
+                user.setEmailConfirmed(false);
+                user.setResetToken(null);
+                user.setResetTokenExpiry(null);
+
                 String encryptedPassword = passwordEncoder.encode(user.getPassword());
                 user.setPassword(encryptedPassword);
-                
+
                 // Generate confirmation token
                 String confirmationToken = UUID.randomUUID().toString();
                 user.setConfirmationToken(confirmationToken);
-                
-                // Set default email confirmation to false
-                user.setEmailConfirmed(false);
-                
+
                 userRepository.save(user);
-                
+
                 // Send confirmation email
                 sendConfirmationEmail(user.getEmail(), confirmationToken);
-                
+
                 return "success";
             } catch (Exception e) {
                 e.printStackTrace();
