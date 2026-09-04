@@ -72,11 +72,12 @@ public class GeminiLiveTokenService {
             Target grammar: %s.
             Target expressions: %s.
             Conduct a spoken real-life simulation. Speak primarily in short, beginner-appropriate Japanese.
+            At the beginning of the session, warmly greet the learner in English, briefly explain the selected situation and objective in no more than two short sentences, then transition naturally into Japanese and begin the role-play with one clear question.
             Decide every opening, reaction, question, clarification, and follow-up dynamically from what the learner actually says. Never follow a predetermined dialogue and never require one exact answer.
             Ask one main question at a time, remain inside the selected scenario, and accept different valid beginner responses. React naturally and supportively. Never mock pronunciation mistakes.
             If the learner struggles, briefly explain in English, then return to Japanese. Keep this conversational rather than quiz-like.
             Naturally conclude when the scenario objective is achieved, the learner ends the session, or the application ends the remaining %d seconds of today's 20-minute allowance.
-            Start the role-play with a natural spoken opening now.
+            Wait until the application tells you to begin, then deliver the welcome and start the role-play.
             """.formatted(s.getTitle(), s.getObjective(), safe(s.getAllowedTopics()), safe(s.getAllowedVocabulary()), safe(s.getAllowedGrammar()), safe(s.getTargetExpressions()), remaining);
     }
     private List<String> safe(List<String> values) { return values == null ? List.of() : values; }
