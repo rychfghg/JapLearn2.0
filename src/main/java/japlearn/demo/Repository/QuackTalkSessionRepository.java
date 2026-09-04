@@ -9,6 +9,4 @@ import japlearn.demo.Entity.QuackTalkSession;
 public interface QuackTalkSessionRepository extends MongoRepository<QuackTalkSession, String> {
     List<QuackTalkSession> findByEmailIgnoreCaseOrderByPracticedAtDesc(String email);
     List<QuackTalkSession> findAllByOrderByPracticedAtDesc();
-    List<QuackTalkSession> findByEmailIgnoreCaseAndRoomTypeAndStatus(String email, String roomType, String status);
-    List<QuackTalkSession> findByRoomTypeAndStatus(String roomType, String status);
 }

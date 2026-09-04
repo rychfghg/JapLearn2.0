@@ -259,16 +259,8 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
 public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
     try {
         User authenticatedUser = japlearnService.authenticate(loginRequest.getEmail(), loginRequest.getPassword());
-        String apiToken = japlearnService.issueApiToken(authenticatedUser);
         authenticatedUser.setPassword(null); 
-        return ResponseEntity.ok(Map.of(
-            "id", authenticatedUser.getId(),
-            "email", authenticatedUser.getEmail(),
-            "fname", authenticatedUser.getFname(),
-            "lname", authenticatedUser.getLname(),
-            "role", authenticatedUser.getRole(),
-            "apiToken", apiToken
-        ));
+        return ResponseEntity.ok(authenticatedUser);
     } catch (UsernameNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.singletonMap("error", "User not found"));
     } catch (BadCredentialsException ex) {

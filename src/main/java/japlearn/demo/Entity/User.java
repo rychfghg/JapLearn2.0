@@ -1,7 +1,5 @@
 package japlearn.demo.Entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -18,7 +16,6 @@ public class User {
     private String email;
     private String password;
     private String role;
-    private String apiToken;
     private String confirmationToken;
     private boolean isEmailConfirmed = false;
     
@@ -131,10 +128,6 @@ public class User {
     public void setRole(String role) {
         this.role = role;
     }
-
-    @JsonIgnore
-    public String getApiToken() { return apiToken; }
-    public void setApiToken(String apiToken) { this.apiToken = apiToken; }
 
     public String getConfirmationToken() {
         return confirmationToken;

@@ -12,7 +12,7 @@ RUN mvn -B -DskipTests clean package
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-RUN apk add --no-cache ffmpeg && addgroup -S japlearn && adduser -S japlearn -G japlearn
+RUN addgroup -S japlearn && adduser -S japlearn -G japlearn
 COPY --from=build /workspace/target/demo-0.0.1-SNAPSHOT.jar app.jar
 
 USER japlearn

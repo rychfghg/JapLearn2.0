@@ -6,8 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.Map;
-import java.security.SecureRandom;
-import java.util.Base64;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,17 +26,7 @@ import japlearn.demo.Repository.UserRepository;
 
 @Service
 public class UserService {
-    private static final SecureRandom TOKEN_RANDOM = new SecureRandom();
     private static final ZoneId JAPLEARN_TIME_ZONE = ZoneId.of("Asia/Manila");
-
-    public String issueApiToken(User user) {
-        byte[] bytes = new byte[32];
-        TOKEN_RANDOM.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        user.setApiToken(token);
-        userRepository.save(user);
-        return token;
-    }
     @Value("${app.backend-url}")
     private String appBackendUrl;
 
