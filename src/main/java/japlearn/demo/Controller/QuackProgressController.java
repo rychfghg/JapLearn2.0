@@ -51,6 +51,7 @@ public class QuackProgressController {
         addModule(modules, "Expression Match", averageSituational(situational, "EXPRESSION_MATCH"));
         addModule(modules, "Politeness", averageSituational(situational, "POLITENESS"));
         addModule(modules, "Reply Coach", averageReplies(replies));
+        addArcadeModule(modules, arcade, "QUACKRESPONSE_RUSH", "Response Rush");
         addModule(modules, "QuackTalk", averageTalk(talk));
         addArcadeModule(modules, arcade, "QUACKAMOLE", "Quack-a-Mole");
         addArcadeModule(modules, arcade, "QUACKMAN", "Quackman");
@@ -127,6 +128,6 @@ public class QuackProgressController {
     private int averageAvailable(int... values) { return (int) Math.round(java.util.Arrays.stream(values).filter(value -> value > 0).average().orElse(0)); }
     private int scorePercent(Score score) { if (score.getMaxScore() > 0) return Math.min(100, (int) Math.round(score.getScore() * 100.0 / score.getMaxScore())); if (score.getTotalQuestions() > 0) return Math.min(100, (int) Math.round(score.getCorrectAnswers() * 100.0 / score.getTotalQuestions())); return Math.min(100, Math.max(0, score.getScore())); }
     private Map<String, Object> history(String title, int score) { return Map.of("title", title, "score", score); }
-    private String displayGame(String game) { if (game == null) return "Arcade"; return switch (game.toUpperCase()) { case "QUACKAMOLE" -> "Quack-a-Mole"; case "QUACKMAN" -> "Quackman"; case "QUACKSLATE" -> "QuackSlate"; default -> game; }; }
-    private String routeFor(String area) { if (area.contains("Reply")) return "/QuackResponse"; if (area.contains("Talk")) return "/QuackTalk"; if (area.contains("Mole")) return "/Quackamole"; if (area.contains("Quackman")) return "/QuackmanLevels"; if (area.contains("Slate")) return "/QuackslateMenu"; return "/QuackSituate"; }
+    private String displayGame(String game) { if (game == null) return "Arcade"; return switch (game.toUpperCase()) { case "QUACKRESPONSE_RUSH" -> "Response Rush"; case "QUACKAMOLE" -> "Quack-a-Mole"; case "QUACKMAN" -> "Quackman"; case "QUACKSLATE" -> "QuackSlate"; default -> game; }; }
+    private String routeFor(String area) { if (area.contains("Reply") || area.contains("Response Rush")) return "/QuackResponse"; if (area.contains("Talk")) return "/QuackTalk"; if (area.contains("Mole")) return "/Quackamole"; if (area.contains("Quackman")) return "/QuackmanLevels"; if (area.contains("Slate")) return "/QuackslateMenu"; return "/QuackSituate"; }
 }
