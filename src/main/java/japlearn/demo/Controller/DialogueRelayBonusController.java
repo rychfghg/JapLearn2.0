@@ -57,6 +57,7 @@ public class DialogueRelayBonusController {
             saved.setAccuracyScore(result.accuracy());
             saved.setFluencyScore(result.fluency());
             saved.setCompletenessScore(result.completeness());
+            saved.setContextScore(result.contextScore());
             saved.setFeedback(result.feedback());
             saved.setWordIssues(result.wordIssues());
             saved.setAssessedAt(Instant.now());
@@ -66,6 +67,7 @@ public class DialogueRelayBonusController {
                 Map.entry("appropriate", result.appropriate()), Map.entry("pronunciationScore", result.pronunciation()),
                 Map.entry("accuracyScore", result.accuracy()), Map.entry("fluencyScore", result.fluency()),
                 Map.entry("completenessScore", result.completeness()), Map.entry("feedback", result.feedback()),
+                Map.entry("contextScore", result.contextScore()),
                 Map.entry("english", result.english()), Map.entry("referenceText", result.referenceText()),
                 Map.entry("wordIssues", result.wordIssues()), Map.entry("contextVerdict", result.contextVerdict()),
                 Map.entry("contextExplanation", result.contextExplanation()),

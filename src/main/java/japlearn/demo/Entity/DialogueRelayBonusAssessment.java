@@ -14,7 +14,7 @@ public class DialogueRelayBonusAssessment {
     private String promptId;
     private String promptTitle;
     private String provider = "AZURE_SPEECH";
-    private String assessmentStatus = "SCANNED";
+    private String assessmentStatus = "ASSESSED";
     private String referenceText;
     private String recognizedText;
     private boolean responseAppropriate;
@@ -26,6 +26,7 @@ public class DialogueRelayBonusAssessment {
     private double accuracyScore;
     private double fluencyScore;
     private double completenessScore;
+    private double contextScore;
     private String feedback;
     private List<String> wordIssues = new ArrayList<>();
     private Instant assessedAt = Instant.now();
@@ -64,6 +65,8 @@ public class DialogueRelayBonusAssessment {
     public void setFluencyScore(double fluencyScore) { this.fluencyScore = fluencyScore; }
     public double getCompletenessScore() { return completenessScore; }
     public void setCompletenessScore(double completenessScore) { this.completenessScore = completenessScore; }
+    public double getContextScore() { return contextScore; }
+    public void setContextScore(double contextScore) { this.contextScore = contextScore; }
     public String getFeedback() { return feedback; }
     public void setFeedback(String feedback) { this.feedback = feedback; }
     public List<String> getWordIssues() { return wordIssues; }
