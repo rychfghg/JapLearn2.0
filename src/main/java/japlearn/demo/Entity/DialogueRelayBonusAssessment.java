@@ -13,9 +13,15 @@ public class DialogueRelayBonusAssessment {
     private String email;
     private String promptId;
     private String promptTitle;
+    private String provider = "AZURE_SPEECH";
+    private String assessmentStatus = "SCANNED";
     private String referenceText;
     private String recognizedText;
     private boolean responseAppropriate;
+    private String contextVerdict;
+    private String contextExplanation;
+    private String pronunciationFeedback;
+    private String pronunciationGuide;
     private double pronunciationScore;
     private double accuracyScore;
     private double fluencyScore;
@@ -32,12 +38,24 @@ public class DialogueRelayBonusAssessment {
     public void setPromptId(String promptId) { this.promptId = promptId; }
     public String getPromptTitle() { return promptTitle; }
     public void setPromptTitle(String promptTitle) { this.promptTitle = promptTitle; }
+    public String getProvider() { return provider; }
+    public void setProvider(String provider) { this.provider = provider; }
+    public String getAssessmentStatus() { return assessmentStatus; }
+    public void setAssessmentStatus(String assessmentStatus) { this.assessmentStatus = assessmentStatus; }
     public String getReferenceText() { return referenceText; }
     public void setReferenceText(String referenceText) { this.referenceText = referenceText; }
     public String getRecognizedText() { return recognizedText; }
     public void setRecognizedText(String recognizedText) { this.recognizedText = recognizedText; }
     public boolean isResponseAppropriate() { return responseAppropriate; }
     public void setResponseAppropriate(boolean responseAppropriate) { this.responseAppropriate = responseAppropriate; }
+    public String getContextVerdict() { return contextVerdict; }
+    public void setContextVerdict(String contextVerdict) { this.contextVerdict = contextVerdict; }
+    public String getContextExplanation() { return contextExplanation; }
+    public void setContextExplanation(String contextExplanation) { this.contextExplanation = contextExplanation; }
+    public String getPronunciationFeedback() { return pronunciationFeedback; }
+    public void setPronunciationFeedback(String pronunciationFeedback) { this.pronunciationFeedback = pronunciationFeedback; }
+    public String getPronunciationGuide() { return pronunciationGuide; }
+    public void setPronunciationGuide(String pronunciationGuide) { this.pronunciationGuide = pronunciationGuide; }
     public double getPronunciationScore() { return pronunciationScore; }
     public void setPronunciationScore(double pronunciationScore) { this.pronunciationScore = pronunciationScore; }
     public double getAccuracyScore() { return accuracyScore; }

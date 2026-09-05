@@ -24,17 +24,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class DialogueRelayPronunciationService {
-    public record Prompt(String title, String reference, List<List<String>> requiredGroups, String explanation, String english) {}
+    public record Prompt(String title, String reference, List<List<String>> requiredGroups, String explanation, String english, String pronunciationGuide) {}
     public record Result(String recognizedText, boolean appropriate, double pronunciation, double accuracy,
                          double fluency, double completeness, String feedback, String english,
-                         String referenceText, List<String> wordIssues) {}
+                         String referenceText, List<String> wordIssues, String contextVerdict,
+                         String contextExplanation, String pronunciationFeedback,
+                         String pronunciationGuide, List<String> missingIdeas) {}
 
     private static final Map<String, Prompt> PROMPTS = Map.of(
-        "bonus-1", new Prompt("Workplace clarification", "すみません、もう一度ゆっくりお願いします。", List.of(List.of("もう一度"), List.of("ゆっくり"), List.of("お願い")), "Politely ask the speaker to repeat the instruction more slowly.", "Excuse me, please say it once more slowly."),
-        "bonus-2", new Prompt("Asking for meaning", "すみません、それはどういう意味ですか？", List.of(List.of("どういう意味", "どんな意味")), "Ask for the meaning instead of pretending to understand.", "Excuse me, what does that mean?"),
-        "bonus-3", new Prompt("Explaining an allergy", "アレルギーがあります。これが入っていますか？", List.of(List.of("アレルギー"), List.of("入って", "入っています")), "State the allergy and check whether the ingredient is included.", "I have an allergy. Does this contain it?"),
-        "bonus-4", new Prompt("Reporting a lost wallet", "すみません、財布をなくしました。", List.of(List.of("財布"), List.of("なくしました", "失くしました", "落としました")), "Clearly tell the officer that your wallet is missing.", "Excuse me, I lost my wallet."),
-        "bonus-5", new Prompt("Asking where to go", "すみません、どこへ行けばいいですか？", List.of(List.of("どこ"), List.of("行けば", "行ったら", "行く")), "Ask the staff member which place or direction you should go to.", "Excuse me, where should I go?")
+        "bonus-1", new Prompt("Workplace clarification", "すみません、もう一度ゆっくりお願いします。", List.of(List.of("もう一度"), List.of("ゆっくり"), List.of("お願い")), "Politely ask the speaker to repeat the instruction more slowly.", "Excuse me, please say it once more slowly.", "SU-MI-MA-SEN · MOU I-CHI-DO · YUK-KU-RI · O-NE-GAI-SHI-MA-SU"),
+        "bonus-2", new Prompt("Asking for meaning", "すみません、それはどういう意味ですか？", List.of(List.of("どういう意味", "どんな意味")), "Ask for the meaning instead of pretending to understand.", "Excuse me, what does that mean?", "SU-MI-MA-SEN · SO-RE WA · DOU IU I-MI DE-SU KA"),
+        "bonus-3", new Prompt("Explaining an allergy", "アレルギーがあります。これが入っていますか？", List.of(List.of("アレルギー"), List.of("入って", "入っています")), "State the allergy and check whether the ingredient is included.", "I have an allergy. Does this contain it?", "A-RE-RU-GII GA A-RI-MA-SU · KO-RE GA HAIT-TE I-MA-SU KA"),
+        "bonus-4", new Prompt("Reporting a lost wallet", "すみません、財布をなくしました。", List.of(List.of("財布"), List.of("なくしました", "失くしました", "落としました")), "Clearly tell the officer that your wallet is missing.", "Excuse me, I lost my wallet.", "SU-MI-MA-SEN · SAI-FU O · NA-KU-SHI-MA-SHI-TA"),
+        "bonus-5", new Prompt("Asking where to go", "すみません、どこへ行けばいいですか？", List.of(List.of("どこ"), List.of("行けば", "行ったら", "行く")), "Ask the staff member which place or direction you should go to.", "Excuse me, where should I go?", "SU-MI-MA-SEN · DO-KO E · I-KE-BA II DE-SU KA")
     );
 
     private final ObjectMapper json;
@@ -44,6 +46,8 @@ public class DialogueRelayPronunciationService {
 
     public DialogueRelayPronunciationService(ObjectMapper json) { this.json = json; }
     public Prompt prompt(String id) { return PROMPTS.get(id); }
+    public boolean configured() { return speechKey != null && !speechKey.isBlank(); }
+    public String region() { return speechRegion; }
 
     public Result assess(String promptId, MultipartFile audio) throws Exception {
         Prompt prompt = PROMPTS.get(promptId);
@@ -85,23 +89,38 @@ public class DialogueRelayPronunciationService {
         JsonNode assessment = best.path("PronunciationAssessment");
         String recognized = best.path("Display").asText(best.path("Lexical").asText(""));
         String normalized = normalize(recognized);
-        boolean intent = !normalized.isBlank() && prompt.requiredGroups().stream()
-            .allMatch(group -> group.stream().map(this::normalize).anyMatch(normalized::contains));
+        List<String> missingIdeas = new ArrayList<>();
+        int matchedIdeas = 0;
+        for (List<String> group : prompt.requiredGroups()) {
+            boolean matched = group.stream().map(this::normalize).anyMatch(normalized::contains);
+            if (matched) matchedIdeas++; else missingIdeas.add(group.get(0));
+        }
         double pronunciation = score(assessment, "PronScore");
         double accuracy = score(assessment, "AccuracyScore");
         double fluency = score(assessment, "FluencyScore");
         double completeness = score(assessment, "CompletenessScore");
-        boolean appropriate = intent && completeness >= 45 && accuracy >= 45;
+        boolean appropriate = !normalized.isBlank() && matchedIdeas == prompt.requiredGroups().size();
+        String contextVerdict = normalized.isBlank() ? "NOT_HEARD" : appropriate ? "COMPLETE" : matchedIdeas > 0 ? "PARTIAL" : "DOES_NOT_FIT";
         List<String> issues = new ArrayList<>();
         best.path("Words").forEach(word -> {
             String error = word.path("PronunciationAssessment").path("ErrorType").asText("None");
             if (!"None".equalsIgnoreCase(error)) issues.add(word.path("Word").asText() + ": " + error);
         });
-        String feedback = appropriate
-            ? (pronunciation >= 80 ? "Your response fits the situation and was clearly pronounced." : "Your response fits the situation. Practice it once more for clearer pronunciation.")
-            : "The response was not clear enough for this situation. Use the suggested phrase and try again next time.";
+        String contextExplanation = switch (contextVerdict) {
+            case "COMPLETE" -> "Your meaning fits the situation and includes the information Sumi needs.";
+            case "PARTIAL" -> "Azure heard a related part, but the response is incomplete. Add " + String.join(" and ", missingIdeas) + " to complete the message.";
+            case "DOES_NOT_FIT" -> "Azure heard Japanese, but it did not communicate the requested action for this situation. " + prompt.explanation();
+            default -> "Azure could not find a usable Japanese transcription. Move closer to the microphone, speak a little louder, and reduce background noise.";
+        };
+        String pronunciationFeedback = recognized.isBlank()
+            ? "No pronunciation score can be interpreted until speech is recognized."
+            : pronunciation >= 80 ? "Your recognized words were pronounced clearly."
+            : pronunciation >= 60 ? "Your pronunciation was understandable, but some sounds need a slower, clearer attempt."
+            : "Speak more slowly and separate the sound groups shown in the pronunciation guide.";
+        String feedback = contextExplanation + " " + pronunciationFeedback;
         return new Result(recognized, appropriate, pronunciation, accuracy, fluency, completeness,
-            feedback + " " + prompt.explanation(), prompt.english(), prompt.reference(), issues);
+            feedback, prompt.english(), prompt.reference(), issues, contextVerdict,
+            contextExplanation, pronunciationFeedback, prompt.pronunciationGuide(), missingIdeas);
     }
 
     private double score(JsonNode node, String field) { return Math.round(node.path(field).asDouble(0) * 10.0) / 10.0; }

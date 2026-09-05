@@ -29,6 +29,11 @@ public class DialogueRelayBonusController {
         this.assessments = assessments;
     }
 
+    @GetMapping("/status")
+    public Map<String, Object> status() {
+        return Map.of("provider", "AZURE_SPEECH", "configured", speech.configured(), "region", speech.region(), "rawAudioStored", false);
+    }
+
     @PostMapping(value = "/assess", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> assess(@RequestPart("audio") MultipartFile audio,
                                     @RequestParam String email,
@@ -44,6 +49,10 @@ public class DialogueRelayBonusController {
             saved.setReferenceText(result.referenceText());
             saved.setRecognizedText(result.recognizedText());
             saved.setResponseAppropriate(result.appropriate());
+            saved.setContextVerdict(result.contextVerdict());
+            saved.setContextExplanation(result.contextExplanation());
+            saved.setPronunciationFeedback(result.pronunciationFeedback());
+            saved.setPronunciationGuide(result.pronunciationGuide());
             saved.setPronunciationScore(result.pronunciation());
             saved.setAccuracyScore(result.accuracy());
             saved.setFluencyScore(result.fluency());
@@ -58,7 +67,11 @@ public class DialogueRelayBonusController {
                 Map.entry("accuracyScore", result.accuracy()), Map.entry("fluencyScore", result.fluency()),
                 Map.entry("completenessScore", result.completeness()), Map.entry("feedback", result.feedback()),
                 Map.entry("english", result.english()), Map.entry("referenceText", result.referenceText()),
-                Map.entry("wordIssues", result.wordIssues())));
+                Map.entry("wordIssues", result.wordIssues()), Map.entry("contextVerdict", result.contextVerdict()),
+                Map.entry("contextExplanation", result.contextExplanation()),
+                Map.entry("pronunciationFeedback", result.pronunciationFeedback()),
+                Map.entry("pronunciationGuide", result.pronunciationGuide()),
+                Map.entry("missingIdeas", result.missingIdeas())));
         } catch (IllegalArgumentException error) {
             return ResponseEntity.badRequest().body(Map.of("message", error.getMessage()));
         } catch (IllegalStateException error) {
