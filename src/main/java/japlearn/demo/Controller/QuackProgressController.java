@@ -52,6 +52,7 @@ public class QuackProgressController {
         addModule(modules, "Politeness", averageSituational(situational, "POLITENESS"));
         addModule(modules, "Reply Coach", averageReplies(replies));
         addArcadeModule(modules, arcade, "QUACKRESPONSE_RUSH", "Response Rush");
+        addArcadeModule(modules, arcade, "QUACKRESPONSE_RELAY", "Dialogue Relay");
         addModule(modules, "QuackTalk", averageTalk(talk));
         addArcadeModule(modules, arcade, "QUACKAMOLE", "Quack-a-Mole");
         addArcadeModule(modules, arcade, "QUACKMAN", "Quackman");
@@ -77,7 +78,8 @@ public class QuackProgressController {
                 .forEach(item -> history.add(history(item.getGameType().replace('_', ' '), (int) Math.round(item.getAccuracy()))));
         replies.stream().filter(item -> "COMPLETED".equalsIgnoreCase(item.getStatus())).limit(8)
                 .forEach(item -> history.add(history("Reply Coach · " + item.getChapterTitle(), item.getFinalPercentage())));
-        arcade.stream().limit(12).forEach(item -> history.add(history(displayGame(item.getGame()), scorePercent(item))));
+        arcade.stream().filter(this::isPersonalProgressScore).limit(12)
+                .forEach(item -> history.add(history(displayGame(item.getGame()), scorePercent(item))));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("overallMastery", overall);
@@ -120,14 +122,15 @@ public class QuackProgressController {
 
     private void addModule(List<Map<String, Object>> modules, String label, int value) { if (value > 0) modules.add(Map.of("label", label, "value", value)); }
     private void addArcadeModule(List<Map<String, Object>> modules, List<Score> records, String game, String label) {
-        records.stream().filter(item -> game.equalsIgnoreCase(item.getGame())).mapToInt(this::scorePercent).max().ifPresent(value -> addModule(modules, label, value));
+        records.stream().filter(this::isPersonalProgressScore).filter(item -> game.equalsIgnoreCase(item.getGame())).mapToInt(this::scorePercent).max().ifPresent(value -> addModule(modules, label, value));
     }
     private int averageSituational(List<SituationalAttempt> records, String type) { return (int) Math.round(records.stream().filter(SituationalAttempt::isCompleted).filter(item -> type.equalsIgnoreCase(item.getGameType())).mapToDouble(SituationalAttempt::getAccuracy).average().orElse(0)); }
     private int averageReplies(List<ReplyCoachAttempt> records) { return (int) Math.round(records.stream().filter(item -> "COMPLETED".equalsIgnoreCase(item.getStatus())).mapToInt(ReplyCoachAttempt::getFinalPercentage).average().orElse(0)); }
     private int averageTalk(List<QuackTalkSession> records) { return (int) Math.round(records.stream().filter(QuackTalkSession::isEvaluated).filter(item -> item.getScore() != null).mapToInt(QuackTalkSession::getScore).average().orElse(0)); }
     private int averageAvailable(int... values) { return (int) Math.round(java.util.Arrays.stream(values).filter(value -> value > 0).average().orElse(0)); }
     private int scorePercent(Score score) { if (score.getMaxScore() > 0) return Math.min(100, (int) Math.round(score.getScore() * 100.0 / score.getMaxScore())); if (score.getTotalQuestions() > 0) return Math.min(100, (int) Math.round(score.getCorrectAnswers() * 100.0 / score.getTotalQuestions())); return Math.min(100, Math.max(0, score.getScore())); }
+    private boolean isPersonalProgressScore(Score score) { return !("QUACKSLATE".equalsIgnoreCase(score.getGame()) && "TEACHER_CODED".equalsIgnoreCase(score.getMode())); }
     private Map<String, Object> history(String title, int score) { return Map.of("title", title, "score", score); }
-    private String displayGame(String game) { if (game == null) return "Arcade"; return switch (game.toUpperCase()) { case "QUACKRESPONSE_RUSH" -> "Response Rush"; case "QUACKAMOLE" -> "Quack-a-Mole"; case "QUACKMAN" -> "Quackman"; case "QUACKSLATE" -> "QuackSlate"; default -> game; }; }
-    private String routeFor(String area) { if (area.contains("Reply") || area.contains("Response Rush")) return "/QuackResponse"; if (area.contains("Talk")) return "/QuackTalk"; if (area.contains("Mole")) return "/Quackamole"; if (area.contains("Quackman")) return "/QuackmanLevels"; if (area.contains("Slate")) return "/QuackslateMenu"; return "/QuackSituate"; }
+    private String displayGame(String game) { if (game == null) return "Arcade"; return switch (game.toUpperCase()) { case "QUACKRESPONSE_RUSH" -> "Response Rush"; case "QUACKRESPONSE_RELAY" -> "Dialogue Relay"; case "QUACKAMOLE" -> "Quack-a-Mole"; case "QUACKMAN" -> "Quackman"; case "QUACKSLATE" -> "QuackSlate"; default -> game; }; }
+    private String routeFor(String area) { if (area.contains("Reply") || area.contains("Response Rush") || area.contains("Dialogue Relay")) return "/QuackResponse"; if (area.contains("Talk")) return "/QuackTalk"; if (area.contains("Mole")) return "/Quackamole"; if (area.contains("Quackman")) return "/QuackmanLevels"; if (area.contains("Slate")) return "/QuackslateMenu"; return "/QuackSituate"; }
 }

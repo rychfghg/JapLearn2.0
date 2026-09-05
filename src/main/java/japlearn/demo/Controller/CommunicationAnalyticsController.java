@@ -92,11 +92,12 @@ public class CommunicationAnalyticsController {
         analytics.put("recognitionAccuracy", round(recognitionAccuracy));
         analytics.put("expressionMatchAccuracy", round(expressionAccuracy));
         analytics.put("politenessAccuracy", round(politenessAccuracy));
-        analytics.put("completedActivities", records.size() + speakingRecords.size() + replyCoachRecords.size() + arcadeRecords.size());
+        analytics.put("completedActivities", records.size() + speakingRecords.size() + replyCoachRecords.size()
+                + arcadeRecords.stream().filter(this::isPersonalProgressScore).count());
         analytics.put("quackamoleAccuracy", arcadeAccuracy(arcadeRecords, "QUACKAMOLE"));
         analytics.put("quackmanAccuracy", arcadeAccuracy(arcadeRecords, "QUACKMAN"));
         analytics.put("quackslateAccuracy", arcadeAccuracy(arcadeRecords, "QUACKSLATE"));
-        analytics.put("arcadeCompletedActivities", arcadeRecords.stream().filter(Score::isCompleted).count());
+        analytics.put("arcadeCompletedActivities", arcadeRecords.stream().filter(this::isPersonalProgressScore).filter(Score::isCompleted).count());
         analytics.put("replyCoachCompletedChapters", replyCoachRecords.stream()
                 .map(ReplyCoachAttempt::getChapterId).distinct().count());
         analytics.put("replyCoachAttempts", replyCoachRecords.size());
@@ -137,12 +138,17 @@ public class CommunicationAnalyticsController {
     }
 
     private int arcadeAccuracy(List<Score> records, String game) {
-        return records.stream().filter(record -> game.equalsIgnoreCase(record.getGame()))
+        return records.stream().filter(this::isPersonalProgressScore).filter(record -> game.equalsIgnoreCase(record.getGame()))
                 .mapToInt(record -> record.getMaxScore() > 0
                         ? (int) Math.round(record.getScore() * 100.0 / record.getMaxScore())
                         : record.getTotalQuestions() > 0
                                 ? (int) Math.round(record.getCorrectAnswers() * 100.0 / record.getTotalQuestions())
                                 : Math.min(100, Math.max(0, record.getScore())))
                 .max().orElse(0);
+    }
+
+    private boolean isPersonalProgressScore(Score score) {
+        return !("QUACKSLATE".equalsIgnoreCase(score.getGame())
+                && "TEACHER_CODED".equalsIgnoreCase(score.getMode()));
     }
 }
