@@ -23,6 +23,10 @@ services:
         sync: false
       - key: APP_STUDENT_WEB_URL
         value: https://japlearn.com
+      - key: AZURE_SPEECH_KEY
+        sync: false
+      - key: AZURE_SPEECH_REGION
+        value: southeastasia
       - key: SPRING_WEB_LOG_LEVEL
         value: INFO
       - key: TOMCAT_LOG_LEVEL

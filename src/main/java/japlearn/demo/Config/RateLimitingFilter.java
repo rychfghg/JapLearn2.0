@@ -45,7 +45,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         "/api/users/register", new int[]{6, 60},
         "/api/users/register-teacher", new int[]{6, 60},
         "/api/users/forgot-password", new int[]{5, 60},
-        "/api/users/reset-password", new int[]{10, 60}
+        "/api/users/reset-password", new int[]{10, 60},
+        "/api/dialogue-relay/bonus/assess", new int[]{15, 60}
     );
 
     // Generous fallback so normal gameplay traffic (lesson/score/progress

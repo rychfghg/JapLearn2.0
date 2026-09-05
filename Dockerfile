@@ -12,6 +12,10 @@ RUN mvn -B -DskipTests clean package
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
+# Expo records AAC/M4A on devices and WebM in browsers. Normalize both to the
+# 16 kHz mono PCM WAV required by Azure Pronunciation Assessment.
+RUN apk add --no-cache ffmpeg
+
 RUN addgroup -S japlearn && adduser -S japlearn -G japlearn
 COPY --from=build /workspace/target/demo-0.0.1-SNAPSHOT.jar app.jar
 
