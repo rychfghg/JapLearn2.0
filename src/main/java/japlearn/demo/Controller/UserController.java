@@ -104,6 +104,18 @@ public ResponseEntity<?> resetPassword(@RequestParam("token") String token, @Req
         }
     }
 
+    @PutMapping("/{userId}/guided-phrase-access")
+    public ResponseEntity<?> updateGuidedPhraseAccess(@PathVariable String userId, @RequestBody Map<String, Object> request) {
+        if (!request.containsKey("enabled")) return ResponseEntity.badRequest().body(Map.of("error", "The enabled value is required."));
+        try {
+            User user = japlearnService.updateUser(userId, Map.of("guidedPhraseEnabled", Boolean.TRUE.equals(request.get("enabled"))));
+            user.setPassword(null);
+            return ResponseEntity.ok(Map.of("userId", user.getId(), "guidedPhraseEnabled", user.isGuidedPhraseEnabled()));
+        } catch (IllegalArgumentException error) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", error.getMessage()));
+        }
+    }
+
     @DeleteMapping("/{userId}")
     public ResponseEntity<?> deleteUser(@PathVariable String userId) {
         try {
