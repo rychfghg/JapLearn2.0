@@ -245,6 +245,7 @@ private void sendPasswordResetEmail(String email, String token) {
             user.setPassword(passwordEncoder.encode(String.valueOf(values.get("password"))));
             user.setEmailConfirmed(Boolean.TRUE.equals(values.get("emailConfirmed")));
             user.setApproved(Boolean.TRUE.equals(values.get("approved")));
+            user.setGuidedPhraseEnabled(Boolean.TRUE.equals(values.get("guidedPhraseEnabled")));
             return userRepository.save(user);
         }
 
@@ -257,6 +258,7 @@ private void sendPasswordResetEmail(String email, String token) {
             if (updates.containsKey("role")) user.setRole(String.valueOf(updates.get("role")).trim().toLowerCase());
             if (updates.containsKey("approved")) user.setApproved(Boolean.TRUE.equals(updates.get("approved")));
             if (updates.containsKey("emailConfirmed")) user.setEmailConfirmed(Boolean.TRUE.equals(updates.get("emailConfirmed")));
+            if (updates.containsKey("guidedPhraseEnabled")) user.setGuidedPhraseEnabled(Boolean.TRUE.equals(updates.get("guidedPhraseEnabled")));
             if (updates.containsKey("password") && updates.get("password") != null
                     && !String.valueOf(updates.get("password")).isBlank()) {
                 user.setPassword(passwordEncoder.encode(String.valueOf(updates.get("password"))));
@@ -268,6 +270,7 @@ private void sendPasswordResetEmail(String email, String token) {
                 student.setLname(saved.getLname());
                 student.setApproved(saved.isApproved());
                 student.setEmailConfirmed(saved.isEmailConfirmed());
+                student.setGuidedPhraseEnabled(saved.isGuidedPhraseEnabled());
                 studentRepository.save(student);
             }
             return saved;

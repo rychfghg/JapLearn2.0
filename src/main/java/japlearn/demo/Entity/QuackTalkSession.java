@@ -1,6 +1,7 @@
 package japlearn.demo.Entity;
 
 import java.time.Instant;
+import java.util.List;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -13,10 +14,20 @@ public class QuackTalkSession {
     private String name;
     private String roomType;
     private String language;
+    private String scenarioTitle;
     private int durationSeconds;
+    private int conversationTurns;
     private boolean completed;
     private boolean evaluated;
     private Integer score;
+    private Integer pronunciationScore;
+    private Integer accuracyScore;
+    private Integer fluencyScore;
+    private Integer completenessScore;
+    private Integer contextualAccuracy;
+    private String feedbackSummary;
+    private List<String> expressionsPracticed;
+    private List<String> areasForImprovement;
     private Instant practicedAt = Instant.now();
 
     public String getId() {
@@ -59,6 +70,9 @@ public class QuackTalkSession {
         this.language = language;
     }
 
+    public String getScenarioTitle() { return scenarioTitle; }
+    public void setScenarioTitle(String scenarioTitle) { this.scenarioTitle = scenarioTitle; }
+
     public int getDurationSeconds() {
         return durationSeconds;
     }
@@ -66,6 +80,9 @@ public class QuackTalkSession {
     public void setDurationSeconds(int durationSeconds) {
         this.durationSeconds = durationSeconds;
     }
+
+    public int getConversationTurns() { return conversationTurns; }
+    public void setConversationTurns(int conversationTurns) { this.conversationTurns = conversationTurns; }
 
     public boolean isCompleted() {
         return completed;
@@ -90,6 +107,23 @@ public class QuackTalkSession {
     public void setScore(Integer score) {
         this.score = score;
     }
+
+    public Integer getPronunciationScore() { return pronunciationScore; }
+    public void setPronunciationScore(Integer pronunciationScore) { this.pronunciationScore = pronunciationScore; }
+    public Integer getAccuracyScore() { return accuracyScore; }
+    public void setAccuracyScore(Integer accuracyScore) { this.accuracyScore = accuracyScore; }
+    public Integer getFluencyScore() { return fluencyScore; }
+    public void setFluencyScore(Integer fluencyScore) { this.fluencyScore = fluencyScore; }
+    public Integer getCompletenessScore() { return completenessScore; }
+    public void setCompletenessScore(Integer completenessScore) { this.completenessScore = completenessScore; }
+    public Integer getContextualAccuracy() { return contextualAccuracy; }
+    public void setContextualAccuracy(Integer contextualAccuracy) { this.contextualAccuracy = contextualAccuracy; }
+    public String getFeedbackSummary() { return feedbackSummary; }
+    public void setFeedbackSummary(String feedbackSummary) { this.feedbackSummary = feedbackSummary; }
+    public List<String> getExpressionsPracticed() { return expressionsPracticed; }
+    public void setExpressionsPracticed(List<String> expressionsPracticed) { this.expressionsPracticed = expressionsPracticed; }
+    public List<String> getAreasForImprovement() { return areasForImprovement; }
+    public void setAreasForImprovement(List<String> areasForImprovement) { this.areasForImprovement = areasForImprovement; }
 
     public Instant getPracticedAt() {
         return practicedAt;

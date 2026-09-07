@@ -26,6 +26,7 @@ public class Student extends User {
         this.classCode = classCode;
         this.setEmailConfirmed(user.isEmailConfirmed()); 
         this.setApproved(user.isApproved()); 
+        this.setGuidedPhraseEnabled(user.isGuidedPhraseEnabled());
     }
     
 

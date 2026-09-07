@@ -25,6 +25,7 @@ public class User {
     private LocalDateTime resetTokenExpiry;
     private int dailyGoalStreak;
     private LocalDate dailyGoalLastCompletedDate;
+    private boolean guidedPhraseEnabled = false;
 
     public User() {
     }
@@ -78,6 +79,9 @@ public class User {
     public void setDailyGoalLastCompletedDate(LocalDate dailyGoalLastCompletedDate) {
         this.dailyGoalLastCompletedDate = dailyGoalLastCompletedDate;
     }
+
+    public boolean isGuidedPhraseEnabled() { return guidedPhraseEnabled; }
+    public void setGuidedPhraseEnabled(boolean guidedPhraseEnabled) { this.guidedPhraseEnabled = guidedPhraseEnabled; }
 
     // Other Getters and Setters remain unchanged
 
