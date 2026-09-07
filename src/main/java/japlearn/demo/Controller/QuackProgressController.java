@@ -78,6 +78,10 @@ public class QuackProgressController {
                 .forEach(item -> history.add(history(item.getGameType().replace('_', ' '), (int) Math.round(item.getAccuracy()))));
         replies.stream().filter(item -> "COMPLETED".equalsIgnoreCase(item.getStatus())).limit(8)
                 .forEach(item -> history.add(history("Reply Coach · " + item.getChapterTitle(), item.getFinalPercentage())));
+        talk.stream().filter(QuackTalkSession::isEvaluated).filter(item -> item.getScore() != null).limit(12)
+                .forEach(item -> history.add(history(
+                        "GUIDED_PHRASE".equalsIgnoreCase(item.getRoomType()) ? "QuackTalk · Guided Phrase" : "QuackTalk · Talk with Sumi",
+                        item.getScore())));
         arcade.stream().filter(this::isPersonalProgressScore).limit(12)
                 .forEach(item -> history.add(history(displayGame(item.getGame()), scorePercent(item))));
 
