@@ -7,8 +7,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -38,27 +36,10 @@ public class GeminiLiveConversationProvider implements LiveConversationProvider 
     public LiveAccess createGuidedPhraseAccess(String instruction) throws Exception {
         if (!configured()) throw new IllegalStateException("Gemini Live is not configured.");
         Instant now = Instant.now();
-        Map<String,Object> config = new LinkedHashMap<>();
-        config.put("responseModalities", List.of("AUDIO"));
-        config.put("systemInstruction", Map.of("parts", List.of(Map.of("text", instruction))));
-        config.put("speechConfig", Map.of("voiceConfig", Map.of("prebuiltVoiceConfig", Map.of("voiceName", voice))));
-        config.put("inputAudioTranscription", Map.of());
-        config.put("outputAudioTranscription", Map.of());
-        // Gemini 3.1 Flash Live currently rejects Affective Dialog. Keep this
-        // out of the setup instead of allowing token provisioning to fail 400.
-        config.put("thinkingConfig", Map.of("thinkingLevel", "LOW"));
-        config.put("realtimeInputConfig", Map.of("automaticActivityDetection", Map.of("disabled", true)));
-        config.put("sessionResumption", Map.of());
-        config.put("contextWindowCompression", Map.of("slidingWindow", Map.of()));
-        config.put("tools", List.of(Map.of("functionDeclarations", List.of(
-            Map.of("name","prepare_practice_turn","description","Call before speaking each of the five learner turns. Provide the Japanese phrase to assess and its learning support.","parameters",Map.of("type","OBJECT","properties",Map.of("targetJapanese",Map.of("type","STRING"),"englishMeaning",Map.of("type","STRING"),"learnerInstruction",Map.of("type","STRING")),"required",List.of("targetJapanese","englishMeaning","learnerInstruction"))),
-            Map.of("name","evaluate_learner_meaning","description","Call after each learner answer to record contextual quality separately from pronunciation.","parameters",Map.of("type","OBJECT","properties",Map.of("contextScore",Map.of("type","INTEGER"),"appropriate",Map.of("type","BOOLEAN"),"explanation",Map.of("type","STRING"),"betterResponse",Map.of("type","STRING")),"required",List.of("contextScore","appropriate","explanation","betterResponse")))
-        ))));
         Map<String,Object> body = Map.of(
             "uses", 1,
             "expireTime", now.plus(25, ChronoUnit.MINUTES).toString(),
-            "newSessionExpireTime", now.plus(1, ChronoUnit.MINUTES).toString(),
-            "liveConnectConstraints", Map.of("model", "models/" + model, "config", config));
+            "newSessionExpireTime", now.plus(1, ChronoUnit.MINUTES).toString());
         HttpRequest request = HttpRequest.newBuilder(URI.create(TOKEN_URL)).timeout(Duration.ofSeconds(20))
             .header("x-goog-api-key", apiKey).header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
@@ -73,7 +54,7 @@ public class GeminiLiveConversationProvider implements LiveConversationProvider 
         JsonNode result = json.readTree(response.body());
         String token = result.path("name").asText();
         if (token.isBlank()) throw new IllegalStateException("Gemini did not return a Live access token.");
-        return new LiveAccess(token, model, WS_URL, voice);
+        return new LiveAccess(token, model, WS_URL, voice, instruction);
     }
 
     private String safeError(String body) {
