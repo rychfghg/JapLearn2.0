@@ -123,7 +123,7 @@ public class QuackProgressController {
             stage.put("progress", value);
             stage.put("status", value >= 80 ? "MASTERED" : value > 0 ? "IN PROGRESS" : "READY");
             stage.put("unlocked", index == 0 || mastery >= Math.min(80, 40 + index * 5));
-            if ("QuackTalk".equals(module.get("label"))) stage.put("activities", quackTalkBreakdown(talk));
+            if ("QuackTalk".equals(module.get("label"))) stage.put("activities", report.get("quackTalkBreakdown"));
             stages.add(stage);
         }
         @SuppressWarnings("unchecked")
