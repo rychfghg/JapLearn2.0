@@ -69,9 +69,17 @@ public class QuackProgressController {
                 .filter(item -> (int) item.get("value") < 70)
                 .map(item -> item.get("label") + " needs reinforcement")
                 .toList();
-        List<String> mistakes = situational.stream().filter(item -> item.getWrongAnswers() > 0)
+        List<String> mistakes = new ArrayList<>(situational.stream().filter(item -> item.getWrongAnswers() > 0)
                 .map(item -> item.getGameType().replace('_', ' ') + ": " + item.getWrongAnswers() + " responses to review")
-                .distinct().limit(6).toList();
+                .distinct().limit(6).toList());
+        talk.stream().filter(item -> "GUIDED_PHRASE".equalsIgnoreCase(item.getRoomType()))
+                .filter(QuackTalkSession::isEvaluated)
+                .flatMap(item -> item.getAreasForImprovement() == null
+                        ? java.util.stream.Stream.empty()
+                        : item.getAreasForImprovement().stream())
+                .filter(item -> item != null && !item.isBlank())
+                .map(item -> "Guided Phrase: " + item)
+                .distinct().limit(Math.max(0, 6 - mistakes.size())).forEach(mistakes::add);
 
         List<Map<String, Object>> history = new ArrayList<>();
         situational.stream().filter(SituationalAttempt::isCompleted).limit(12)
@@ -95,6 +103,7 @@ public class QuackProgressController {
         result.put("repeatedMistakes", mistakes);
         result.put("history", history);
         result.put("moduleAccuracy", modules);
+        result.put("quackTalkBreakdown", quackTalkBreakdown(talk));
         return result;
     }
 
@@ -108,9 +117,14 @@ public class QuackProgressController {
         for (int index = 0; index < modules.size(); index++) {
             Map<String, Object> module = modules.get(index);
             int value = (int) module.get("value");
-            stages.add(Map.of("id", index + 1, "name", module.get("label"), "progress", value,
-                    "status", value >= 80 ? "MASTERED" : value > 0 ? "IN PROGRESS" : "READY",
-                    "unlocked", index == 0 || mastery >= Math.min(80, 40 + index * 5)));
+            Map<String, Object> stage = new LinkedHashMap<>();
+            stage.put("id", index + 1);
+            stage.put("name", module.get("label"));
+            stage.put("progress", value);
+            stage.put("status", value >= 80 ? "MASTERED" : value > 0 ? "IN PROGRESS" : "READY");
+            stage.put("unlocked", index == 0 || mastery >= Math.min(80, 40 + index * 5));
+            if ("QuackTalk".equals(module.get("label"))) stage.put("activities", quackTalkBreakdown(talk));
+            stages.add(stage);
         }
         @SuppressWarnings("unchecked")
         List<String> weakAreas = (List<String>) report.get("weakAreas");
@@ -131,6 +145,13 @@ public class QuackProgressController {
     private int averageSituational(List<SituationalAttempt> records, String type) { return (int) Math.round(records.stream().filter(SituationalAttempt::isCompleted).filter(item -> type.equalsIgnoreCase(item.getGameType())).mapToDouble(SituationalAttempt::getAccuracy).average().orElse(0)); }
     private int averageReplies(List<ReplyCoachAttempt> records) { return (int) Math.round(records.stream().filter(item -> "COMPLETED".equalsIgnoreCase(item.getStatus())).mapToInt(ReplyCoachAttempt::getFinalPercentage).average().orElse(0)); }
     private int averageTalk(List<QuackTalkSession> records) { return (int) Math.round(records.stream().filter(QuackTalkSession::isEvaluated).filter(item -> item.getScore() != null).mapToInt(QuackTalkSession::getScore).average().orElse(0)); }
+    private int averageTalk(List<QuackTalkSession> records, String roomType) { return (int) Math.round(records.stream().filter(QuackTalkSession::isEvaluated).filter(item -> item.getScore() != null).filter(item -> roomType.equalsIgnoreCase(item.getRoomType())).mapToInt(QuackTalkSession::getScore).average().orElse(0)); }
+    private long countTalk(List<QuackTalkSession> records, String roomType) { return records.stream().filter(QuackTalkSession::isEvaluated).filter(item -> item.getScore() != null).filter(item -> roomType.equalsIgnoreCase(item.getRoomType())).count(); }
+    private List<Map<String, Object>> quackTalkBreakdown(List<QuackTalkSession> records) {
+        return List.of(
+                Map.of("key", "guidedPhrase", "label", "Guided Phrase", "value", averageTalk(records, "GUIDED_PHRASE"), "sessions", countTalk(records, "GUIDED_PHRASE")),
+                Map.of("key", "talkWithSumi", "label", "Talk with Sumi", "value", averageTalk(records, "TALK_WITH_SUMI"), "sessions", countTalk(records, "TALK_WITH_SUMI")));
+    }
     private int averageAvailable(int... values) { return (int) Math.round(java.util.Arrays.stream(values).filter(value -> value > 0).average().orElse(0)); }
     private int scorePercent(Score score) { if (score.getMaxScore() > 0) return Math.min(100, (int) Math.round(score.getScore() * 100.0 / score.getMaxScore())); if (score.getTotalQuestions() > 0) return Math.min(100, (int) Math.round(score.getCorrectAnswers() * 100.0 / score.getTotalQuestions())); return Math.min(100, Math.max(0, score.getScore())); }
     private boolean isPersonalProgressScore(Score score) { return !("QUACKSLATE".equalsIgnoreCase(score.getGame()) && "TEACHER_CODED".equalsIgnoreCase(score.getMode())); }
