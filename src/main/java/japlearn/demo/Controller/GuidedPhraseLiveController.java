@@ -35,8 +35,9 @@ public class GuidedPhraseLiveController {
         var learner=users.findByEmail(email);if(learner==null)return ResponseEntity.status(403).body(Map.of("message","This learner account could not be verified.","accessDisabled",true));
         if(!learner.isGuidedPhraseEnabled())return ResponseEntity.status(403).body(Map.of("message","Guided Phrase Practice is not available for your account yet. Your teacher or administrator will let you know when access is ready.","accessDisabled",true));
         int used=practicesUsed(email);if(used>=DAILY_PRACTICE_LIMIT)return ResponseEntity.status(429).body(Map.of("message","You have completed today's five Guided Phrase sessions. Come back tomorrow for more practice.","practicesRemaining",0));
-        String scenario=request.getOrDefault("scenario","First conversation in Japan");
-        try {var access=live.createGuidedPhraseAccess(instruction(scenario));return ResponseEntity.ok(Map.of("token",access.token(),"model",access.model(),"websocketUrl",access.websocketUrl(),"voice",access.voice(),"systemInstruction",access.systemInstruction(),"practicesRemaining",Math.max(0,DAILY_PRACTICE_LIMIT-used)));}catch(IllegalStateException e){return ResponseEntity.status(503).body(Map.of("message",e.getMessage()));}catch(Exception e){return ResponseEntity.status(502).body(Map.of("message","Sumi could not start the conversation. Please try again."));}
+        String scenario=request.getOrDefault("scenario","Everyday life in Japan");
+        int dailyRotation=Math.floorMod(LocalDate.now(ZoneId.of("Asia/Manila")).getDayOfYear()+used,10);
+        try {var access=live.createGuidedPhraseAccess(instruction(scenario,dailyRotation));return ResponseEntity.ok(Map.of("token",access.token(),"model",access.model(),"websocketUrl",access.websocketUrl(),"voice",access.voice(),"systemInstruction",access.systemInstruction(),"practicesRemaining",Math.max(0,DAILY_PRACTICE_LIMIT-used)));}catch(IllegalStateException e){return ResponseEntity.status(503).body(Map.of("message",e.getMessage()));}catch(Exception e){return ResponseEntity.status(502).body(Map.of("message","Sumi could not start the conversation. Please try again."));}
     }
 
     @PostMapping(value="/assess",consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -58,13 +59,14 @@ public class GuidedPhraseLiveController {
     private int number(Object value){try{return Integer.parseInt(String.valueOf(value));}catch(Exception e){return 0;}}
     private int score(Object value){return Math.max(0,Math.min(100,number(value)));}
     private List<String> strings(Object value){if(!(value instanceof List<?> values))return List.of();return values.stream().map(String::valueOf).filter(item->!item.isBlank()).limit(20).toList();}
-    private String instruction(String scenario){return """
+    private String instruction(String scenario,int dailyRotation){return """
       You are Sumi, JapLearn's friendly female Japanese conversation coach. This is Guided Phrase Practice only.
-      Selected scenario: %s. The learner is a beginner. Start immediately by greeting the learner briefly in Japanese, then in English explain that this is Guided Phrase Practice and that you will complete five short spoken exchanges together.
+      Selected scenario: %s. Daily rotation: %d. The learner is a beginner. Start immediately by greeting the learner briefly in Japanese, then in English explain that this is Guided Phrase Practice and that you will complete five short spoken exchanges together.
       Conduct a realistic audio-first Japanese simulation. Ask or model one short beginner-appropriate phrase at a time, then wait for the learner's microphone response. React to what the learner actually says and dynamically choose the next turn; do not use a fixed question list and do not require one exact sentence when the meaning is valid.
       Before speaking each learner prompt, you MUST call prepare_practice_turn with the exact Japanese target, accurate beginner-readable romaji, its English meaning, and a short learner instruction. Never ask the learner to respond until this call succeeds. After every learner answer, call evaluate_learner_meaning before your spoken reaction. These tool calls record learning data and must happen exactly once for each of all five turns.
-      Make the five exchanges meaningfully different. Vary the communicative purpose (for example greeting, introducing oneself, asking for help, clarifying, and thanking) while staying inside the selected scenario. Do not repeat the same target phrase or merely reword the same exercise.
+      Make the five exchanges meaningfully different and useful in everyday life in Japan. Select five different purposes from self-introduction, asking directions, trains, shopping, restaurants, convenience stores, hotels, requesting help, asking someone to repeat, apologizing, thanking, and polite social interaction. Do not make the session mostly greetings. Use the daily rotation to vary the five purposes and wording from day to day.
+      Never repeat a target phrase inside a session. For a self-introduction phrase, use the exact placeholder {LEARNER_NAME}; JapLearn will replace it locally with the learner's name. Do not ask for or guess personal information.
       Stay strictly inside the selected scenario. Use Japanese primarily. If the learner is confused, briefly explain in English and return to Japanese. Keep every response short. Encourage gently and never ridicule pronunciation.
       Complete exactly five learner-response turns. At the fifth response, naturally conclude and congratulate the learner. Do not continue asking questions after five learner answers. A separate assessment service produces pronunciation, accuracy, fluency, completeness, and word-level scores; never invent numerical pronunciation scores.
-      """.formatted(scenario);}
+      """.formatted(scenario,dailyRotation);}
 }
