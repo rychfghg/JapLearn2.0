@@ -45,7 +45,9 @@ public class CommunicationAnalyticsController {
         List<SituationalAttempt> records = attempts
                 .findByEmailIgnoreCaseAndCompletedTrueOrderByCompletedAtDesc(email);
         List<QuackTalkSession> speakingRecords = talkSessions
-                .findByEmailIgnoreCaseOrderByPracticedAtDesc(email);
+                .findByEmailIgnoreCaseOrderByPracticedAtDesc(email).stream()
+                .filter(QuackTalkSession::isCompleted)
+                .toList();
         List<ReplyCoachAttempt> replyCoachRecords = replyCoachAttempts
                 .findByEmailIgnoreCaseAndStatusIgnoreCaseOrderByUpdatedAtDesc(email, "COMPLETED");
         List<Score> arcadeRecords = scores.findByEmailIgnoreCaseOrderByDateDesc(email);

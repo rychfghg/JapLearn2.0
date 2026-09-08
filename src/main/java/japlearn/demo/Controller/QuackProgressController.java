@@ -146,7 +146,7 @@ public class QuackProgressController {
     private int averageReplies(List<ReplyCoachAttempt> records) { return (int) Math.round(records.stream().filter(item -> "COMPLETED".equalsIgnoreCase(item.getStatus())).mapToInt(ReplyCoachAttempt::getFinalPercentage).average().orElse(0)); }
     private int averageTalk(List<QuackTalkSession> records) { return (int) Math.round(records.stream().filter(QuackTalkSession::isEvaluated).filter(item -> item.getScore() != null).mapToInt(QuackTalkSession::getScore).average().orElse(0)); }
     private int averageTalk(List<QuackTalkSession> records, String roomType) { return (int) Math.round(records.stream().filter(QuackTalkSession::isEvaluated).filter(item -> item.getScore() != null).filter(item -> roomType.equalsIgnoreCase(item.getRoomType())).mapToInt(QuackTalkSession::getScore).average().orElse(0)); }
-    private long countTalk(List<QuackTalkSession> records, String roomType) { return records.stream().filter(QuackTalkSession::isEvaluated).filter(item -> item.getScore() != null).filter(item -> roomType.equalsIgnoreCase(item.getRoomType())).count(); }
+    private long countTalk(List<QuackTalkSession> records, String roomType) { return records.stream().filter(QuackTalkSession::isCompleted).filter(item -> roomType.equalsIgnoreCase(item.getRoomType())).count(); }
     private List<Map<String, Object>> quackTalkBreakdown(List<QuackTalkSession> records) {
         return List.of(
                 Map.of("key", "guidedPhrase", "label", "Guided Phrase", "value", averageTalk(records, "GUIDED_PHRASE"), "sessions", countTalk(records, "GUIDED_PHRASE")),
