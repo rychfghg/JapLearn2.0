@@ -23,11 +23,17 @@ public class GuidedPhrasePronunciationService {
         Path input=Files.createTempFile("guided-input-",".audio"),wav=Files.createTempFile("guided-azure-",".wav");
         try{upload.transferTo(input);convert(input,wav);return sdk(wav,reference);}finally{Files.deleteIfExists(input);Files.deleteIfExists(wav);}
     }
+    public Scores assessOpenConversation(MultipartFile upload) throws Exception{
+        if(!configured())throw new IllegalStateException("Azure Speech is not configured.");
+        if(upload==null||upload.isEmpty())throw new IllegalArgumentException("A spoken response is required.");
+        Path input=Files.createTempFile("conversation-input-",".audio"),wav=Files.createTempFile("conversation-azure-",".wav");
+        try{upload.transferTo(input);convert(input,wav);return sdk(wav,"");}finally{Files.deleteIfExists(input);Files.deleteIfExists(wav);}
+    }
     private Scores sdk(Path wav,String reference)throws Exception{
         try(SpeechConfig speech=SpeechConfig.fromSubscription(key,region)){
             speech.setSpeechRecognitionLanguage("ja-JP");
             try(AudioConfig audio=AudioConfig.fromWavFileInput(wav.toString());SpeechRecognizer recognizer=new SpeechRecognizer(speech,audio);
-                PronunciationAssessmentConfig config=new PronunciationAssessmentConfig(reference,PronunciationAssessmentGradingSystem.HundredMark,PronunciationAssessmentGranularity.Phoneme,true)){
+                PronunciationAssessmentConfig config=new PronunciationAssessmentConfig(reference==null?"":reference,PronunciationAssessmentGradingSystem.HundredMark,PronunciationAssessmentGranularity.Phoneme,reference!=null&&!reference.isBlank())){
                 config.applyTo(recognizer);
                 try(SpeechRecognitionResult result=recognizer.recognizeOnceAsync().get(35,TimeUnit.SECONDS)){
                     if(result.getReason()==ResultReason.NoMatch)return noSpeech(reference);

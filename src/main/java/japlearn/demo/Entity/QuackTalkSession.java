@@ -2,6 +2,7 @@ package japlearn.demo.Entity;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -28,6 +29,7 @@ public class QuackTalkSession {
     private String feedbackSummary;
     private List<String> expressionsPracticed;
     private List<String> areasForImprovement;
+    private List<Map<String,Object>> turnAssessments;
     private Instant practicedAt = Instant.now();
 
     public String getId() {
@@ -124,6 +126,8 @@ public class QuackTalkSession {
     public void setExpressionsPracticed(List<String> expressionsPracticed) { this.expressionsPracticed = expressionsPracticed; }
     public List<String> getAreasForImprovement() { return areasForImprovement; }
     public void setAreasForImprovement(List<String> areasForImprovement) { this.areasForImprovement = areasForImprovement; }
+    public List<Map<String,Object>> getTurnAssessments() { return turnAssessments; }
+    public void setTurnAssessments(List<Map<String,Object>> turnAssessments) { this.turnAssessments = turnAssessments; }
 
     public Instant getPracticedAt() {
         return practicedAt;
