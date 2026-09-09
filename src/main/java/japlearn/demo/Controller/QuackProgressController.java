@@ -53,7 +53,10 @@ public class QuackProgressController {
         addModule(modules, "Reply Coach", averageReplies(replies));
         addArcadeModule(modules, arcade, "QUACKRESPONSE_RUSH", "Response Rush");
         addArcadeModule(modules, arcade, "QUACKRESPONSE_RELAY", "Dialogue Relay");
-        addModule(modules, "QuackTalk", averageTalk(talk));
+        int quackTalkAverage = averageTalk(talk);
+        if (talk.stream().anyMatch(QuackTalkSession::isEvaluated)) {
+            modules.add(Map.of("label", "QuackTalk", "value", quackTalkAverage));
+        }
         addArcadeModule(modules, arcade, "QUACKAMOLE", "Quack-a-Mole");
         addArcadeModule(modules, arcade, "QUACKMAN", "Quackman");
         addArcadeModule(modules, arcade, "QUACKSLATE", "QuackSlate");
@@ -72,13 +75,14 @@ public class QuackProgressController {
         List<String> mistakes = new ArrayList<>(situational.stream().filter(item -> item.getWrongAnswers() > 0)
                 .map(item -> item.getGameType().replace('_', ' ') + ": " + item.getWrongAnswers() + " responses to review")
                 .distinct().limit(6).toList());
-        talk.stream().filter(item -> "GUIDED_PHRASE".equalsIgnoreCase(item.getRoomType()))
-                .filter(QuackTalkSession::isEvaluated)
+        talk.stream().filter(QuackTalkSession::isEvaluated)
                 .flatMap(item -> item.getAreasForImprovement() == null
                         ? java.util.stream.Stream.empty()
-                        : item.getAreasForImprovement().stream())
-                .filter(item -> item != null && !item.isBlank())
-                .map(item -> "Guided Phrase: " + item)
+                        : item.getAreasForImprovement().stream()
+                                .filter(area -> area != null && !area.isBlank())
+                                .map(area -> ("GUIDED_PHRASE".equalsIgnoreCase(item.getRoomType())
+                                        ? "Guided Phrase: "
+                                        : "Talk with Sumi: ") + area))
                 .distinct().limit(Math.max(0, 6 - mistakes.size())).forEach(mistakes::add);
 
         List<Map<String, Object>> history = new ArrayList<>();
