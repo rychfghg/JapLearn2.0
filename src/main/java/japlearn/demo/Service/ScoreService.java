@@ -26,11 +26,18 @@ public class ScoreService {
         // analysis, and teacher reports. getHighScore still derives the personal
         // best using the repository's score-descending query.
         attempt.setId(null);
+        attempt.setEmail(attempt.getEmail().trim().toLowerCase());
+        attempt.setGame(attempt.getGame().trim().toUpperCase());
+        attempt.setScore(Math.max(0, attempt.getScore()));
+        attempt.setMaxScore(Math.max(0, attempt.getMaxScore()));
+        attempt.setCorrectAnswers(Math.max(0, attempt.getCorrectAnswers()));
+        attempt.setTotalQuestions(Math.max(0, attempt.getTotalQuestions()));
         return scoreRepository.save(attempt);
     }
 
     public Optional<Score> getHighScore(String email, String game) {
-        return scoreRepository.findTopByEmailAndGameOrderByScoreDesc(email, game);
+        return scoreRepository.findTopByEmailIgnoreCaseAndGameIgnoreCaseOrderByScoreDesc(
+                email.trim().toLowerCase(), game.trim().toUpperCase());
     }
     public List<Score> getScoresByEmail(String email) { return scoreRepository.findByEmailIgnoreCaseOrderByDateDesc(email); }
 
