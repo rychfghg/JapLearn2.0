@@ -17,7 +17,10 @@ public class ClassesService {
     private ClassesRepository classRepository;
  
     // Method to add class codes ensuring no duplicates
-    public ResponseEntity<?> addClass(String classCode) {
+    public ResponseEntity<?> addClass(String classCode, String teacherEmail) {
+        if (teacherEmail == null || teacherEmail.isBlank()) {
+            return ResponseEntity.badRequest().body("{\"error\": \"Teacher account is required\"}");
+        }
         // Check if class code already exists
         Optional<Classes> existingClass = classRepository.findByClassCodes(classCode);
         if (existingClass.isPresent()) {
@@ -26,22 +29,27 @@ public class ClassesService {
  
         Classes newClassEntity = new Classes();
         newClassEntity.setClassCodes(classCode);
+        newClassEntity.setOwnerTeacherEmail(teacherEmail.trim().toLowerCase());
         classRepository.save(newClassEntity);
         return ResponseEntity.ok(newClassEntity);
     }
  
     // Method to remove clSass codes handling possible multiple entries
-    public void removeClass(String classCode) {
-        List<Classes> classesToRemove = classRepository.findAllByClassCodes(classCode);
-        if (!classesToRemove.isEmpty()) {
-            classRepository.deleteAll(classesToRemove);
-        } else {
-            throw new RuntimeException("Class not found");
-        }
+    public void removeClass(String classCode, String teacherEmail) {
+        Classes ownedClass = classRepository
+                .findByClassCodesAndOwnerTeacherEmailIgnoreCase(classCode, teacherEmail)
+                .orElseThrow(() -> new RuntimeException("Class not found in this teacher account"));
+        classRepository.delete(ownedClass);
     }
  
     // Retrieve all class codes
-    public List<Classes> getAllClasses() {
-        return classRepository.findAll();
+    public List<Classes> getClassesForTeacher(String teacherEmail) {
+        if (teacherEmail == null || teacherEmail.isBlank()) return List.of();
+        return classRepository.findAllByOwnerTeacherEmailIgnoreCase(teacherEmail.trim());
+    }
+
+    public boolean teacherOwnsClass(String teacherEmail, String classCode) {
+        return teacherEmail != null && classCode != null
+                && classRepository.findByClassCodesAndOwnerTeacherEmailIgnoreCase(classCode, teacherEmail).isPresent();
     }
 }

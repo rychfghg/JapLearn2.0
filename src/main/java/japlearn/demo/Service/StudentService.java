@@ -49,8 +49,18 @@ public class StudentService {
         }
         return false;
     }
+
+    public boolean joinClassCodeByTeacher(String teacherEmail, String email, String classCode) {
+        if (!teacherOwnsClass(teacherEmail, classCode)) return false;
+        return joinClassCodeByEmail(email, classCode);
+    }
  
     public List<Student> getStudentsByClassCode(String classCode) {
+        return studentRepository.findByClassCode(classCode);
+    }
+
+    public List<Student> getStudentsByClassCodeForTeacher(String teacherEmail, String classCode) {
+        if (!teacherOwnsClass(teacherEmail, classCode)) return List.of();
         return studentRepository.findByClassCode(classCode);
     }
     
@@ -79,8 +89,24 @@ public class StudentService {
         return false;
     }
 
+    public boolean removeStudentByTeacher(String teacherEmail, String classCode, String fname, String lname) {
+        if (!teacherOwnsClass(teacherEmail, classCode)) return false;
+        return removeStudentByFullName(classCode, fname, lname);
+    }
+
     public List<Student> getAllStudents() {
     return studentRepository.findAll();
 }
+
+    public List<Student> getStudentsForTeacher(String teacherEmail) {
+        List<String> classCodes = classesRepository.findAllByOwnerTeacherEmailIgnoreCase(teacherEmail).stream()
+                .map(Classes::getClassCodes)
+                .toList();
+        return classCodes.isEmpty() ? List.of() : studentRepository.findByClassCodeIn(classCodes);
+    }
+
+    private boolean teacherOwnsClass(String teacherEmail, String classCode) {
+        return teacherEmail != null && classCode != null
+                && classesRepository.findByClassCodesAndOwnerTeacherEmailIgnoreCase(classCode, teacherEmail).isPresent();
+    }
 }
- 

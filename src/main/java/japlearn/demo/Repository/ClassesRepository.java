@@ -13,5 +13,7 @@ public interface ClassesRepository extends MongoRepository<Classes, String> {
  
     // Add method to find all entries by class code
     List<Classes> findAllByClassCodes(String classCodes);
+    Optional<Classes> findByClassCodesAndOwnerTeacherEmailIgnoreCase(String classCodes, String ownerTeacherEmail);
+    List<Classes> findAllByOwnerTeacherEmailIgnoreCase(String ownerTeacherEmail);
 }
  

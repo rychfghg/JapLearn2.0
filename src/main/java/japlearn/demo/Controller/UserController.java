@@ -127,94 +127,17 @@ public ResponseEntity<?> resetPassword(@RequestParam("token") String token, @Req
     }
 
     @GetMapping("/confirm")
-public ResponseEntity<String> confirmEmail(@RequestParam("token") String token) {
-    String result = japlearnService.confirmUser(token);
-    if ("confirmed".equals(result)) {
-        return ResponseEntity.ok("<!DOCTYPE html>"
-            + "<html>"
-            + "<head>"
-            + "    <title>Email Confirmation</title>"
-            + "    <style>"
-            + "        body {"
-            + "            font-family: Arial, sans-serif;"
-            + "            text-align: center;"
-            + "            background-color: #f4f4f9;"
-            + "            color: #333;"
-            + "            margin: 0;"
-            + "            padding: 0;"
-            + "            display: flex;"
-            + "            justify-content: center;"
-            + "            align-items: center;"
-            + "            height: 100vh;"
-            + "        }"
-            + "        .container {"
-            + "            padding: 20px;"
-            + "            border: 1px solid #ddd;"
-            + "            border-radius: 10px;"
-            + "            background-color: #fff;"
-            + "            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);"
-            + "            max-width: 400px;"
-            + "            margin: 0 auto;"
-            + "        }"
-            + "        h1 {"
-            + "            color: #4CAF50;"
-            + "        }"
-            + "        .mascot {"
-            + "            max-width: 100px;"
-            + "            margin: 20px auto;"
-            + "        }"
-            + "    </style>"
-            + "</head>"
-            + "<body>"
-            + "    <div class='container'>"
-            + "        <h1>Confirmation Successful!</h1>"
-            + "        <img src='https://unnivyu.github.io/Japlearn-1/assets/svg/jpLogo.svg' alt='JapLearn Mascot' class='mascot' />"
-            + "        <p>Thank you for confirming your email address.</p>"
-            + "        <p>You can now access all the features of JapLearn. Enjoy!</p>"
-            + "    </div>"
-            + "</body>"
-            + "</html>");
-    } else {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("<!DOCTYPE html>"
-            + "<html>"
-            + "<head>"
-            + "    <title>Email Confirmation</title>"
-            + "    <style>"
-            + "        body {"
-            + "            font-family: Arial, sans-serif;"
-            + "            text-align: center;"
-            + "            background-color: #f4f4f9;"
-            + "            color: #333;"
-            + "            margin: 0;"
-            + "            padding: 0;"
-            + "            display: flex;"
-            + "            justify-content: center;"
-            + "            align-items: center;"
-            + "            height: 100vh;"
-            + "        }"
-            + "        .container {"
-            + "            padding: 20px;"
-            + "            border: 1px solid #ddd;"
-            + "            border-radius: 10px;"
-            + "            background-color: #fff;"
-            + "            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);"
-            + "            max-width: 400px;"
-            + "            margin: 0 auto;"
-            + "        }"
-            + "        h1 {"
-            + "            color: #FF5722;"
-            + "        }"
-            + "    </style>"
-            + "</head>"
-            + "<body>"
-            + "    <div class='container'>"
-            + "        <h1>Link Invalid</h1>"
-            + "        <p>The link you clicked is either invalid or has expired.</p>"
-            + "        <p>Please try registering again or contact support for help.</p>"
-            + "    </div>"
-            + "</body>"
-            + "</html>");
-    }
+    public ResponseEntity<?> confirmEmail(@RequestParam("token") String token) {
+        User confirmedUser = japlearnService.confirmUser(token);
+        if (confirmedUser == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Invalid or expired confirmation link"));
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Email confirmed",
+                "role", confirmedUser.getRole() == null ? "student" : confirmedUser.getRole().toLowerCase()
+        ));
 }
 
 
@@ -264,8 +187,16 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
 public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
     try {
         User authenticatedUser = japlearnService.authenticate(loginRequest.getEmail(), loginRequest.getPassword());
+        String portalSessionToken = authenticatedUser.getPortalSessionToken();
         authenticatedUser.setPassword(null); 
-        return ResponseEntity.ok(authenticatedUser);
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("id", authenticatedUser.getId());
+        response.put("email", authenticatedUser.getEmail());
+        response.put("fname", authenticatedUser.getFname());
+        response.put("lname", authenticatedUser.getLname());
+        response.put("role", authenticatedUser.getRole());
+        response.put("portalSessionToken", portalSessionToken);
+        return ResponseEntity.ok(response);
     } catch (UsernameNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.singletonMap("error", "User not found"));
     } catch (BadCredentialsException ex) {

@@ -1,5 +1,6 @@
 package japlearn.demo.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -12,4 +13,5 @@ public interface StudentProgressRepository extends MongoRepository<StudentProgre
     
     // Custom method to find progress by student's email
     Optional<StudentProgress> findByEmail(String email);
+    List<StudentProgress> findByEmailIn(List<String> emails);
 }

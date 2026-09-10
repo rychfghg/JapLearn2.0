@@ -84,7 +84,7 @@ public class SecurityConfig {
 
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Teacher-Token"));
         // No cookies/sessions are used, so credentialed CORS is unnecessary
         // and left off to keep the policy as tight as possible.
         configuration.setAllowCredentials(false);

@@ -1,6 +1,7 @@
 package japlearn.demo.Service;
 
 import java.time.LocalDate;
+import java.util.UUID;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
@@ -429,21 +430,26 @@ private void sendPasswordResetEmail(String email, String token) {
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new BadCredentialsException("Invalid password");
         }
+
+        if ("teacher".equalsIgnoreCase(user.getRole())) {
+            user.setPortalSessionToken(UUID.randomUUID().toString());
+            userRepository.save(user);
+        }
     
         return user;
     }
     
 
-    public String confirmUser(String token) {
+    public User confirmUser(String token) {
         User user = userRepository.findByConfirmationToken(token);
         if (user == null) {
-            return "invalid";
+            return null;
         }
 
         user.setEmailConfirmed(true);
         user.setConfirmationToken(null); // Clear the token after confirmation
         userRepository.save(user);
 
-        return "confirmed";
+        return user;
     }
 }

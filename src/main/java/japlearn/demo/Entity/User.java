@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Document(collection = "users")
 public class User {
@@ -26,6 +27,8 @@ public class User {
     private int dailyGoalStreak;
     private LocalDate dailyGoalLastCompletedDate;
     private boolean guidedPhraseEnabled = false;
+    @JsonIgnore
+    private String portalSessionToken;
 
     public User() {
     }
@@ -82,6 +85,8 @@ public class User {
 
     public boolean isGuidedPhraseEnabled() { return guidedPhraseEnabled; }
     public void setGuidedPhraseEnabled(boolean guidedPhraseEnabled) { this.guidedPhraseEnabled = guidedPhraseEnabled; }
+    public String getPortalSessionToken() { return portalSessionToken; }
+    public void setPortalSessionToken(String portalSessionToken) { this.portalSessionToken = portalSessionToken; }
 
     // Other Getters and Setters remain unchanged
 

@@ -33,6 +33,12 @@ public class StudentProgressService {
         return studentProgressRepository.findAll();
     }
 
+    public List<StudentProgress> getProgressForStudents(List<String> studentEmails) {
+        return studentEmails == null || studentEmails.isEmpty()
+                ? List.of()
+                : studentProgressRepository.findByEmailIn(studentEmails);
+    }
+
     // Method to check the state of a specific field (e.g., vocab1, badge1)
     public boolean checkFieldState(String email, String field) {
         StudentProgress progress = getProgress(email);

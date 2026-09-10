@@ -17,6 +17,8 @@ import java.util.List;
 
 import japlearn.demo.Entity.StudentProgress;
 import japlearn.demo.Service.StudentProgressService;
+import japlearn.demo.Service.StudentService;
+import japlearn.demo.Service.TeacherAuthorizationService;
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -26,9 +28,23 @@ public class StudentProgressController {
     @Autowired
     private StudentProgressService studentProgressService;
 
+    @Autowired private StudentService studentService;
+    @Autowired private TeacherAuthorizationService teacherAuthorization;
+
     @GetMapping
     public List<StudentProgress> getAllProgress() {
         return studentProgressService.getAllProgress();
+    }
+
+    @GetMapping("/teacher")
+    public List<StudentProgress> getTeacherProgress(@RequestParam String teacherEmail,
+            @org.springframework.web.bind.annotation.RequestHeader("X-Teacher-Token") String sessionToken) {
+        String owner = teacherAuthorization.requireTeacher(teacherEmail, sessionToken);
+        List<String> emails = studentService.getStudentsForTeacher(owner).stream()
+                .map(student -> student.getEmail())
+                .filter(email -> email != null && !email.isBlank())
+                .toList();
+        return studentProgressService.getProgressForStudents(emails);
     }
 
     // Endpoint to get progress for a student by email
