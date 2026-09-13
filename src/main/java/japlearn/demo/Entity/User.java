@@ -26,6 +26,8 @@ public class User {
     private LocalDateTime resetTokenExpiry;
     private int dailyGoalStreak;
     private LocalDate dailyGoalLastCompletedDate;
+    private LocalDate dailyGoalMinutesDate;
+    private int dailyGoalMinutes;
     private boolean guidedPhraseEnabled = false;
     @JsonIgnore
     private String portalSessionToken;
@@ -82,6 +84,11 @@ public class User {
     public void setDailyGoalLastCompletedDate(LocalDate dailyGoalLastCompletedDate) {
         this.dailyGoalLastCompletedDate = dailyGoalLastCompletedDate;
     }
+
+    public LocalDate getDailyGoalMinutesDate() { return dailyGoalMinutesDate; }
+    public void setDailyGoalMinutesDate(LocalDate dailyGoalMinutesDate) { this.dailyGoalMinutesDate = dailyGoalMinutesDate; }
+    public int getDailyGoalMinutes() { return dailyGoalMinutes; }
+    public void setDailyGoalMinutes(int dailyGoalMinutes) { this.dailyGoalMinutes = dailyGoalMinutes; }
 
     public boolean isGuidedPhraseEnabled() { return guidedPhraseEnabled; }
     public void setGuidedPhraseEnabled(boolean guidedPhraseEnabled) { this.guidedPhraseEnabled = guidedPhraseEnabled; }

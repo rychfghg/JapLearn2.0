@@ -11,4 +11,5 @@ public interface ScoreRepository extends MongoRepository<Score, String> {
     List<Score> findByDate(String date);
     Optional<Score> findTopByEmailIgnoreCaseAndGameIgnoreCaseOrderByScoreDesc(String email, String game);
     List<Score> findByEmailIgnoreCaseOrderByDateDesc(String email);
+    Optional<Score> findByEmailIgnoreCaseAndClientAttemptId(String email, String clientAttemptId);
 }

@@ -167,6 +167,15 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
         }
     }
 
+    @PostMapping("/daily-goal/minute")
+    public ResponseEntity<?> recordDailyGoalMinute(@RequestBody Map<String, String> request) {
+        try {
+            return ResponseEntity.ok(japlearnService.recordDailyGoalMinute(request.get("email")));
+        } catch (IllegalArgumentException error) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", error.getMessage()));
+        }
+    }
+
     @PostMapping("/daily-goal/complete")
     public ResponseEntity<?> completeDailyGoal(@RequestBody Map<String, String> request) {
         try {

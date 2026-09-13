@@ -24,6 +24,7 @@ public class SituationalAttempt {
     private int level;
     private int setNumber;
     private String topic;
+    private String clientAttemptId;
     private Instant completedAt = Instant.now();
 
     public String getId() { return id; }
@@ -58,6 +59,8 @@ public class SituationalAttempt {
     public void setSetNumber(int setNumber) { this.setNumber = setNumber; }
     public String getTopic() { return topic; }
     public void setTopic(String topic) { this.topic = topic; }
+    public String getClientAttemptId() { return clientAttemptId; }
+    public void setClientAttemptId(String clientAttemptId) { this.clientAttemptId = clientAttemptId; }
     public Instant getCompletedAt() { return completedAt; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
 }

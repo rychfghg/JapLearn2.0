@@ -179,6 +179,7 @@ private void sendPasswordResetEmail(String email, String token) {
         public synchronized Map<String, Object> getDailyGoalStreak(String email) {
             User user = requireUserByEmail(email);
             LocalDate today = LocalDate.now(JAPLEARN_TIME_ZONE);
+            resetDailyGoalMinutesIfNewDay(user, today);
             LocalDate lastCompleted = user.getDailyGoalLastCompletedDate();
 
             if (lastCompleted != null
@@ -189,6 +190,32 @@ private void sendPasswordResetEmail(String email, String token) {
             }
 
             return dailyGoalStreakResponse(user, today);
+        }
+
+        public synchronized Map<String, Object> recordDailyGoalMinute(String email) {
+            User user = requireUserByEmail(email);
+            LocalDate today = LocalDate.now(JAPLEARN_TIME_ZONE);
+            resetDailyGoalMinutesIfNewDay(user, today);
+            if (user.getDailyGoalMinutes() < 20) {
+                user.setDailyGoalMinutes(user.getDailyGoalMinutes() + 1);
+                if (user.getDailyGoalMinutes() == 20 && !today.equals(user.getDailyGoalLastCompletedDate())) {
+                    LocalDate lastCompleted = user.getDailyGoalLastCompletedDate();
+                    user.setDailyGoalStreak(today.minusDays(1).equals(lastCompleted)
+                            ? user.getDailyGoalStreak() + 1 : 1);
+                    user.setDailyGoalLastCompletedDate(today);
+                }
+                userRepository.save(user);
+            }
+            return dailyGoalStreakResponse(user, today);
+        }
+
+        private void resetDailyGoalMinutesIfNewDay(User user, LocalDate today) {
+            if (!today.equals(user.getDailyGoalMinutesDate())) {
+                user.setDailyGoalMinutesDate(today);
+                // Preserve a goal completed by the previous client before minutes were stored on the account.
+                user.setDailyGoalMinutes(today.equals(user.getDailyGoalLastCompletedDate()) ? 20 : 0);
+                userRepository.save(user);
+            }
         }
 
         public synchronized Map<String, Object> completeDailyGoal(String email) {
@@ -224,6 +251,8 @@ private void sendPasswordResetEmail(String email, String token) {
 
         private Map<String, Object> dailyGoalStreakResponse(User user, LocalDate today) {
             Map<String, Object> response = new LinkedHashMap<>();
+            response.put("date", today.toString());
+            response.put("minutes", user.getDailyGoalMinutes());
             response.put("streak", user.getDailyGoalStreak());
             response.put(
                     "lastCompletedDate",

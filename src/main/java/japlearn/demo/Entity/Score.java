@@ -18,6 +18,7 @@ public class Score {
     private int totalQuestions;
     private boolean completed = true;
     private String mode;
+    private String clientAttemptId;
 
     public Score() {
     }
@@ -83,4 +84,6 @@ public class Score {
     public void setCompleted(boolean completed) { this.completed = completed; }
     public String getMode() { return mode; }
     public void setMode(String mode) { this.mode = mode; }
+    public String getClientAttemptId() { return clientAttemptId; }
+    public void setClientAttemptId(String clientAttemptId) { this.clientAttemptId = clientAttemptId; }
 }

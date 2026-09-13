@@ -12,4 +12,5 @@ public interface SituationalAttemptRepository extends MongoRepository<Situationa
     List<SituationalAttempt> findByEmailIgnoreCaseAndCompletedTrueOrderByCompletedAtDesc(String email);
     List<SituationalAttempt> findByGameTypeIgnoreCaseOrderByCompletedAtDesc(String gameType);
     Optional<SituationalAttempt> findTopByEmailIgnoreCaseAndGameTypeIgnoreCaseOrderByScoreDesc(String email, String gameType);
+    Optional<SituationalAttempt> findByEmailIgnoreCaseAndClientAttemptId(String email, String clientAttemptId);
 }

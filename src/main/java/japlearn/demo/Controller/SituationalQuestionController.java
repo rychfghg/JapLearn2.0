@@ -116,10 +116,14 @@ public class SituationalQuestionController {
     }
 
     @PostMapping("/attempts")
-    public ResponseEntity<SituationalAttempt> saveAttempt(@RequestBody SituationalAttempt attempt) {
+    public synchronized ResponseEntity<SituationalAttempt> saveAttempt(@RequestBody SituationalAttempt attempt) {
         if (attempt.getEmail() == null || attempt.getEmail().isBlank()
                 || attempt.getGameType() == null || attempt.getGameType().isBlank()) {
             return ResponseEntity.badRequest().build();
+        }
+        if (attempt.getClientAttemptId() != null && !attempt.getClientAttemptId().isBlank()) {
+            var existing = attempts.findByEmailIgnoreCaseAndClientAttemptId(attempt.getEmail(), attempt.getClientAttemptId());
+            if (existing.isPresent()) return ResponseEntity.ok(existing.get());
         }
         attempt.setId(null);
         attempt.setCompletedAt(Instant.now());
