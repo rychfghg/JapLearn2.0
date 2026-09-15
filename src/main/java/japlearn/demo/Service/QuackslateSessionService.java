@@ -114,7 +114,7 @@ public class QuackslateSessionService {
 
     public List<QuackslateQuestion> availableQuestions(String teacherEmail) {
         return questions.findAll().stream()
-                .filter(q -> (q.isApproved() && blank(q.getCreatedBy()))
+                .filter(q -> (q.isApproved() && (blank(q.getCreatedBy()) || "SYSTEM".equalsIgnoreCase(q.getCreatedBy())))
                         || teacherEmail.equalsIgnoreCase(q.getCreatedBy()))
                 .toList();
     }
@@ -129,9 +129,11 @@ public class QuackslateSessionService {
         question.setPrompt(question.getPrompt().trim());
         question.setTranslation(question.getTranslation().trim());
         question.setCorrectAnswer(question.getCorrectAnswer().trim());
+        question.setOptions(java.util.Arrays.stream(question.getOptions())
+                .map(tile -> tile == null ? "" : tile.strip()).toArray(String[]::new));
         List<String> tiles = List.of(question.getOptions());
         List<String> answerTiles = List.of(question.getCorrectAnswer().split("\\s+"));
-        if (new LinkedHashSet<>(tiles).size() != tiles.size()
+        if (tiles.stream().anyMatch(String::isBlank) || new LinkedHashSet<>(tiles).size() != tiles.size()
                 || answerTiles.stream().anyMatch(tile -> !tiles.contains(tile)))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Each answer word must match one distinct word tile");
@@ -141,6 +143,16 @@ public class QuackslateSessionService {
         question.setApproved(true);
         question.setSystemAvailable(false); // Teacher-created content never changes solo mode.
         return questions.save(question);
+    }
+
+    public void deleteSession(String teacherEmail, String code) {
+        QuackslateGameCode game = owned(teacherEmail, code);
+        String state = status(game, Instant.now());
+        if ("LIVE".equals(state) || "ENDED".equals(state) || !game.getJoinedStudentEmails().isEmpty())
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only unused drafts or upcoming codes can be deleted. Sessions with students keep their records.");
+        content.deleteAll(content.findByGameCode(game.getGameCode()));
+        games.delete(game);
     }
 
     public SessionView setQuestions(String teacherEmail, String code, List<String> ids) {

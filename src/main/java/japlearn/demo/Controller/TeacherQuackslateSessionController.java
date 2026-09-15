@@ -5,6 +5,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -31,6 +35,19 @@ public class TeacherQuackslateSessionController {
     }
 
     public record ScheduleRequest(Instant startsAt, Instant endsAt) {}
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, String>> validationError(ResponseStatusException error) {
+        return ResponseEntity.status(error.getStatusCode()).body(Map.of("message",
+                error.getReason() == null ? "The request could not be completed." : error.getReason()));
+    }
+
+    @DeleteMapping("/sessions/{code}")
+    public ResponseEntity<Void> delete(@RequestParam String teacherEmail,
+            @RequestHeader("X-Teacher-Token") String token, @PathVariable String code) {
+        sessions.deleteSession(authorization.requireTeacher(teacherEmail, token), code);
+        return ResponseEntity.noContent().build();
+    }
 
     @GetMapping("/questions")
     public List<QuackslateQuestion> questions(@RequestParam String teacherEmail,
