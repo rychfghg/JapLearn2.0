@@ -38,7 +38,6 @@ import japlearn.demo.Entity.ReplyCoachChapter;
 import japlearn.demo.Repository.ReplyCoachAttemptRepository;
 import japlearn.demo.Repository.ReplyCoachChapterRepository;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/reply-coach")
 public class ReplyCoachController {

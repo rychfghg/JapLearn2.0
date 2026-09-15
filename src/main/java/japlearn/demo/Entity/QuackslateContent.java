@@ -15,6 +15,8 @@ public class QuackslateContent {
     private String[] options;       // Options for multiple-choice questions
     private String correctAnswer;   // The correct answer for the content
     private String wrongAnswer; // Add the wrongAnswer field
+    private String explanation;
+    private Integer questionOrder;
     // Default constructor
     public QuackslateContent() {}
 
@@ -33,6 +35,10 @@ public class QuackslateContent {
     public String getWrongAnswer() {
         return wrongAnswer;
     }
+    public String getExplanation() { return explanation; }
+    public void setExplanation(String explanation) { this.explanation = explanation; }
+    public Integer getQuestionOrder() { return questionOrder; }
+    public void setQuestionOrder(Integer questionOrder) { this.questionOrder = questionOrder; }
 
     public void setWrongAnswer(String wrongAnswer) {
         this.wrongAnswer = wrongAnswer;

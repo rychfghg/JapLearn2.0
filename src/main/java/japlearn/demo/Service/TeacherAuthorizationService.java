@@ -3,6 +3,8 @@ package japlearn.demo.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import japlearn.demo.Entity.User;
 import japlearn.demo.Repository.UserRepository;
@@ -24,7 +26,9 @@ public class TeacherAuthorizationService {
         User user = userRepository.findByEmail(normalizedEmail);
         if (user == null || !"teacher".equalsIgnoreCase(user.getRole())
                 || user.getPortalSessionToken() == null
-                || !user.getPortalSessionToken().equals(sessionToken)) {
+                || !java.security.MessageDigest.isEqual(user.getPortalSessionToken().getBytes(java.nio.charset.StandardCharsets.UTF_8), sessionToken.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                || user.getPortalSessionExpiresAt() == null
+                || LocalDateTime.now(ZoneId.of("Asia/Manila")).isAfter(user.getPortalSessionExpiresAt())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid teacher session");
         }
         return normalizedEmail;

@@ -3,6 +3,7 @@ package japlearn.demo.Entity;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import java.time.Instant;
 
 @Document(collection = "scores")
 public class Score {
@@ -19,6 +20,8 @@ public class Score {
     private boolean completed = true;
     private String mode;
     private String clientAttemptId;
+    private String gameCode;
+    private Instant playedAt;
 
     public Score() {
     }
@@ -86,4 +89,8 @@ public class Score {
     public void setMode(String mode) { this.mode = mode; }
     public String getClientAttemptId() { return clientAttemptId; }
     public void setClientAttemptId(String clientAttemptId) { this.clientAttemptId = clientAttemptId; }
+    public String getGameCode() { return gameCode; }
+    public void setGameCode(String gameCode) { this.gameCode = gameCode; }
+    public Instant getPlayedAt() { return playedAt; }
+    public void setPlayedAt(Instant playedAt) { this.playedAt = playedAt; }
 }

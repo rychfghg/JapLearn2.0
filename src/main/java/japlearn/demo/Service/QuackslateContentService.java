@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Comparator;
 import java.util.Optional;
 
 @Service
@@ -39,7 +40,9 @@ public class QuackslateContentService {
 
     // Get content by gameCode (optional)
     public List<QuackslateContent> getByGameCode(String gameCode) {
-        return quackslateContentRepository.findByGameCode(gameCode);
+        return quackslateContentRepository.findByGameCodeOrderByIdAsc(gameCode).stream()
+                .sorted(Comparator.comparingInt(item -> item.getQuestionOrder() == null
+                        ? item.getId() : item.getQuestionOrder())).toList();
     }
 
     // Update content

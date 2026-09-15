@@ -20,7 +20,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import japlearn.demo.Entity.Score;
 import japlearn.demo.Service.ScoreService;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/scores")
 public class ScoreController {
@@ -34,6 +33,10 @@ public class ScoreController {
 
     @PostMapping("/save")
     public ResponseEntity<Score> saveScore(@RequestBody Score score) {
+        if ("QUACKSLATE".equalsIgnoreCase(score.getGame())
+                && "TEACHER_CODED".equalsIgnoreCase(score.getMode())) {
+            return ResponseEntity.badRequest().build(); // Scheduled scores require student authentication.
+        }
         try {
             return ResponseEntity.ok(scoreService.saveScore(score));
         } catch (Exception e) {
@@ -43,6 +46,9 @@ public class ScoreController {
 
     @PostMapping("/high-score")
     public ResponseEntity<Score> saveHighScore(@RequestBody Score score) {
+        if ("QUACKSLATE".equalsIgnoreCase(score.getGame())
+                && "TEACHER_CODED".equalsIgnoreCase(score.getMode()))
+            return ResponseEntity.badRequest().build();
         if (score.getEmail() == null || score.getGame() == null) {
             return ResponseEntity.badRequest().build();
         }

@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -40,18 +41,24 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     // path -> {requests allowed, window length in seconds}
-    private static final Map<String, int[]> SENSITIVE_LIMITS = Map.of(
-        "/api/users/login", new int[]{10, 60},
-        "/api/users/register", new int[]{6, 60},
-        "/api/users/register-teacher", new int[]{6, 60},
-        "/api/users/forgot-password", new int[]{5, 60},
-        "/api/users/reset-password", new int[]{10, 60},
-        "/api/dialogue-relay/bonus/assess", new int[]{15, 60}
+    private static final Map<String, int[]> SENSITIVE_LIMITS = Map.ofEntries(
+        Map.entry("/api/users/login", new int[]{10, 60}),
+        Map.entry("/api/users/register", new int[]{6, 60}),
+        Map.entry("/api/users/register-teacher", new int[]{6, 60}),
+        Map.entry("/api/users/forgot-password", new int[]{5, 60}),
+        Map.entry("/api/users/reset-password", new int[]{10, 60}),
+        Map.entry("/api/dialogue-relay/bonus/assess", new int[]{10, 60}),
+        Map.entry("/api/guided-phrase/live-token", new int[]{10, 60}),
+        Map.entry("/api/guided-phrase/assess", new int[]{10, 60}),
+        Map.entry("/api/talk-with-sumi/live-token", new int[]{10, 60}),
+        Map.entry("/api/talk-with-sumi/assess", new int[]{10, 60}),
+        Map.entry("/api/talk-with-sumi/reserve-response", new int[]{15, 60})
     );
 
-    // Generous fallback so normal gameplay traffic (lesson/score/progress
-    // fetches) is never affected — this only catches scripted floods.
-    private static final int[] DEFAULT_LIMIT = {200, 60};
+    // Keep ordinary gameplay and queued offline-score synchronization usable
+    // for classrooms whose devices share one public IP. Expensive speech and
+    // authentication routes retain the much tighter limits above.
+    private static final int[] DEFAULT_LIMIT = {600, 60};
 
     private static final int MAX_TRACKED_KEYS = 20_000;
 
@@ -65,7 +72,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         String path = request.getRequestURI();
-        if (path == null || !path.startsWith("/api/")) {
+        if (HttpMethod.OPTIONS.matches(request.getMethod()) || path == null || !path.startsWith("/api/")) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -85,6 +92,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         if (bucket.count.incrementAndGet() > limit[0]) {
             response.setStatus(429);
             response.setHeader("Retry-After", String.valueOf(limit[1]));
+            response.setHeader("Cache-Control", "no-store");
             response.setContentType("application/json");
             response.getWriter().write("{\"error\":\"Too many requests. Please slow down and try again shortly.\"}");
             return;
@@ -101,13 +109,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private String clientIp(HttpServletRequest request) {
-        // Render terminates TLS in front of the app and forwards the real
-        // client IP via X-Forwarded-For; fall back to the socket address for
-        // local/dev runs where no proxy is present.
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+        // server.forward-headers-strategy=native delegates trusted-proxy
+        // parsing to Tomcat. Do not parse a client-supplied X-Forwarded-For
+        // value here because it can be forged when the origin is contacted
+        // directly.
+        String remote = request.getRemoteAddr();
+        return remote == null || remote.isBlank() ? "unknown" : remote;
     }
 }

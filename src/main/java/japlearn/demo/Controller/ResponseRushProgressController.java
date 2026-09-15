@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 import japlearn.demo.Entity.ResponseRushProgress;
 import japlearn.demo.Repository.ResponseRushProgressRepository;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/response-rush/progress")
 public class ResponseRushProgressController {

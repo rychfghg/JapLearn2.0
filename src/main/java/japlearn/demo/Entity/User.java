@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Document(collection = "users")
 public class User {
@@ -15,14 +16,18 @@ public class User {
     private String fname;
     private String lname;
     private String email;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     private String role;
+    @JsonIgnore
     private String confirmationToken;
     private boolean isEmailConfirmed = false;
     
     // New field to track if the user has been approved by the teacher
     private boolean isApproved = false;
+    @JsonIgnore
     private String resetToken;
+    @JsonIgnore
     private LocalDateTime resetTokenExpiry;
     private int dailyGoalStreak;
     private LocalDate dailyGoalLastCompletedDate;
@@ -31,6 +36,8 @@ public class User {
     private boolean guidedPhraseEnabled = false;
     @JsonIgnore
     private String portalSessionToken;
+    @JsonIgnore
+    private LocalDateTime portalSessionExpiresAt;
 
     public User() {
     }
@@ -94,6 +101,8 @@ public class User {
     public void setGuidedPhraseEnabled(boolean guidedPhraseEnabled) { this.guidedPhraseEnabled = guidedPhraseEnabled; }
     public String getPortalSessionToken() { return portalSessionToken; }
     public void setPortalSessionToken(String portalSessionToken) { this.portalSessionToken = portalSessionToken; }
+    public LocalDateTime getPortalSessionExpiresAt() { return portalSessionExpiresAt; }
+    public void setPortalSessionExpiresAt(LocalDateTime portalSessionExpiresAt) { this.portalSessionExpiresAt = portalSessionExpiresAt; }
 
     // Other Getters and Setters remain unchanged
 

@@ -37,7 +37,6 @@ import japlearn.demo.Service.TeacherAuthorizationService;
  * records are not substituted for history: latest, average and highest are
  * calculated from all scored attempts for the selected student.
  */
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/teacher/game-performance")
 public class TeacherGamePerformanceController {

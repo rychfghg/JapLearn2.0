@@ -59,14 +59,9 @@ public class SecurityConfig {
                         "frame-ancestors 'none'"))
             )
             .authorizeHttpRequests(auth -> auth
-                // NOTE: this backend has no session/JWT auth layer yet, so every
-                // controller (game content, scores, user management, etc.) is
-                // still reachable without a login. Locking specific endpoints
-                // down further needs the RN app, the admin portal, and this
-                // config to move together — see RateLimitingFilter and
-                // UserService for the mitigations that ARE safe to ship without
-                // breaking the existing clients (mass-assignment / privilege
-                // escalation fix, reset-token expiry, brute-force throttling).
+                // Learner/gameplay routes retain the existing application flow.
+                // PortalAuthorizationFilter performs the API-level teacher and
+                // administrator checks for every management endpoint.
                 .anyRequest().permitAll()
             );
 
@@ -84,7 +79,8 @@ public class SecurityConfig {
 
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Teacher-Token"));
+        configuration.setAllowedHeaders(List.of(
+                "Authorization", "Content-Type", "Accept", "X-Teacher-Token", "X-Portal-Token"));
         // No cookies/sessions are used, so credentialed CORS is unnecessary
         // and left off to keep the policy as tight as possible.
         configuration.setAllowCredentials(false);

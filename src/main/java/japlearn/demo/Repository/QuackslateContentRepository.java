@@ -9,6 +9,7 @@ public interface QuackslateContentRepository extends MongoRepository<QuackslateC
     
     // Method to get all content for a specific game code (optional)
     List<QuackslateContent> findByGameCode(String gameCode);
+    List<QuackslateContent> findByGameCodeOrderByIdAsc(String gameCode);
 
     // Method to get all content (this will be shared across all class codes)
     @Override

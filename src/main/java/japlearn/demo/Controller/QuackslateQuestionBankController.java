@@ -11,7 +11,6 @@ import japlearn.demo.Repository.QuackslateGameCodeRepository;
 import japlearn.demo.Entity.QuackslateContent;
 import japlearn.demo.Entity.QuackslateGameCode;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/quackslate/question-bank")
 public class QuackslateQuestionBankController {
@@ -61,6 +60,8 @@ public class QuackslateQuestionBankController {
             @RequestBody List<String> questionIds) {
         QuackslateGameCode game = gameRepository.findByGameCode(gameCode).orElse(null);
         if (game == null) return ResponseEntity.notFound().build();
+        if (game.isPublished()) return ResponseEntity.status(409)
+                .body("Published session questions cannot be changed");
         contentRepository.deleteAll(contentRepository.findByGameCode(gameCode));
         int baseId = Math.abs(gameCode.hashCode() % 100000) * 100;
         List<QuackslateQuestion> selected = repository.findAllById(questionIds);

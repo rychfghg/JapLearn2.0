@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 import japlearn.demo.Entity.QuackTalkSession;
 import japlearn.demo.Repository.QuackTalkSessionRepository;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/quackTalkSessions")
 public class QuackTalkSessionController {

@@ -1,7 +1,6 @@
 package japlearn.demo.Service;
 
 import java.time.LocalDate;
-import java.util.UUID;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
@@ -116,7 +115,7 @@ private void sendPasswordResetEmail(String email, String token) {
 
     // Method to reset the password
     public String resetPassword(String token, String newPassword) {
-    if (token == null || token.isBlank() || newPassword == null || newPassword.length() < 6) {
+    if (token == null || token.isBlank() || newPassword == null || newPassword.length() < 8) {
         return "invalid";
     }
 
@@ -140,6 +139,8 @@ private void sendPasswordResetEmail(String email, String token) {
     user.setPassword(encryptedPassword);
     user.setResetToken(null); // Invalidate the token after reset
     user.setResetTokenExpiry(null);
+    user.setPortalSessionToken(null);
+    user.setPortalSessionExpiresAt(null);
     userRepository.save(user);
 
     // If the user is also in the Student table, update the password there
@@ -271,8 +272,14 @@ private void sendPasswordResetEmail(String email, String token) {
             user.setFname(String.valueOf(values.get("fname")).trim());
             user.setLname(String.valueOf(values.get("lname")).trim());
             user.setEmail(email);
-            user.setRole(String.valueOf(values.get("role")).trim().toLowerCase());
-            user.setPassword(passwordEncoder.encode(String.valueOf(values.get("password"))));
+            String role = String.valueOf(values.get("role")).trim().toLowerCase();
+            if (!Set.of("student", "teacher", "admin").contains(role)) {
+                throw new IllegalArgumentException("Invalid account role");
+            }
+            String password = String.valueOf(values.get("password"));
+            if (password.length() < 8) throw new IllegalArgumentException("Password must be at least 8 characters");
+            user.setRole(role);
+            user.setPassword(passwordEncoder.encode(password));
             user.setEmailConfirmed(Boolean.TRUE.equals(values.get("emailConfirmed")));
             user.setApproved(Boolean.TRUE.equals(values.get("approved")));
             user.setGuidedPhraseEnabled(Boolean.TRUE.equals(values.get("guidedPhraseEnabled")));
@@ -291,7 +298,11 @@ private void sendPasswordResetEmail(String email, String token) {
             if (updates.containsKey("guidedPhraseEnabled")) user.setGuidedPhraseEnabled(Boolean.TRUE.equals(updates.get("guidedPhraseEnabled")));
             if (updates.containsKey("password") && updates.get("password") != null
                     && !String.valueOf(updates.get("password")).isBlank()) {
-                user.setPassword(passwordEncoder.encode(String.valueOf(updates.get("password"))));
+                String password = String.valueOf(updates.get("password"));
+                if (password.length() < 8) throw new IllegalArgumentException("Password must be at least 8 characters");
+                user.setPassword(passwordEncoder.encode(password));
+                user.setPortalSessionToken(null);
+                user.setPortalSessionExpiresAt(null);
             }
             User saved = userRepository.save(user);
             Student student = studentRepository.findByEmail(saved.getEmail());
@@ -324,7 +335,7 @@ private void sendPasswordResetEmail(String email, String token) {
                 if (email.isBlank() || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
                     return "invalid";
                 }
-                if (user.getPassword().length() < 6) {
+                if (user.getPassword().length() < 8) {
                     return "invalid";
                 }
 
@@ -445,23 +456,26 @@ private void sendPasswordResetEmail(String email, String token) {
             throw new UsernameNotFoundException("User not found");
         }
     
-        // If the user is a student, check both email confirmation and approval status
-        if ("student".equals(user.getRole())) {
-            if (!user.isEmailConfirmed()) {
-                throw new IllegalStateException("Email not confirmed");
-            }
+        // Check the password before revealing any account-state detail.
+        if (rawPassword == null || !passwordEncoder.matches(rawPassword, user.getPassword())) {
+            throw new BadCredentialsException("Invalid password");
+        }
+
+        // Self-created teacher accounts must confirm their email too. Student
+        // accounts retain the existing teacher-approval requirement.
+        if (!"admin".equalsIgnoreCase(user.getRole()) && !user.isEmailConfirmed()) {
+            throw new IllegalStateException("Email not confirmed");
+        }
+        if ("student".equalsIgnoreCase(user.getRole())) {
             if (!user.isApproved()) {
                 throw new IllegalStateException("User not approved");
             }
         }
-    
-        // Check password regardless of role
-        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
-            throw new BadCredentialsException("Invalid password");
-        }
 
-        if ("teacher".equalsIgnoreCase(user.getRole())) {
+        if ("teacher".equalsIgnoreCase(user.getRole()) || "admin".equalsIgnoreCase(user.getRole())
+                || "student".equalsIgnoreCase(user.getRole())) {
             user.setPortalSessionToken(UUID.randomUUID().toString());
+            user.setPortalSessionExpiresAt(LocalDateTime.now(JAPLEARN_TIME_ZONE).plusHours(12));
             userRepository.save(user);
         }
     

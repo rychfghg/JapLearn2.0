@@ -1,0 +1,56 @@
+package japlearn.demo.Config;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.time.LocalDateTime;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockFilterChain;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import japlearn.demo.Entity.User;
+import japlearn.demo.Repository.UserRepository;
+
+class PortalAuthorizationFilterTest {
+    @Test void rejectsMissingSession() throws Exception {
+        PortalAuthorizationFilter filter = new PortalAuthorizationFilter(mock(UserRepository.class));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(new MockHttpServletRequest("GET", "/api/users"), response, new MockFilterChain());
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test void rejectsTeacherFromAdminRoute() throws Exception {
+        UserRepository repository = mock(UserRepository.class);
+        when(repository.findByPortalSessionToken("teacher-token")).thenReturn(user("teacher", "teacher-token"));
+        PortalAuthorizationFilter filter = new PortalAuthorizationFilter(repository);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/users");
+        request.addHeader("X-Teacher-Token", "teacher-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(request, response, new MockFilterChain());
+        assertThat(response.getStatus()).isEqualTo(403);
+    }
+
+    @Test void allowsAdministratorAndCorsPreflight() throws Exception {
+        UserRepository repository = mock(UserRepository.class);
+        when(repository.findByPortalSessionToken("admin-token")).thenReturn(user("admin", "admin-token"));
+        PortalAuthorizationFilter filter = new PortalAuthorizationFilter(repository);
+        MockHttpServletRequest adminRequest = new MockHttpServletRequest("GET", "/api/users");
+        adminRequest.addHeader("X-Portal-Token", "admin-token");
+        MockFilterChain adminChain = new MockFilterChain();
+        filter.doFilter(adminRequest, new MockHttpServletResponse(), adminChain);
+        assertThat(adminChain.getRequest()).isNotNull();
+
+        MockFilterChain optionsChain = new MockFilterChain();
+        filter.doFilter(new MockHttpServletRequest("OPTIONS", "/api/users/id"), new MockHttpServletResponse(), optionsChain);
+        assertThat(optionsChain.getRequest()).isNotNull();
+    }
+
+    private User user(String role, String token) {
+        User user = new User();
+        user.setRole(role);
+        user.setPortalSessionToken(token);
+        user.setPortalSessionExpiresAt(LocalDateTime.now().plusHours(1));
+        return user;
+    }
+}

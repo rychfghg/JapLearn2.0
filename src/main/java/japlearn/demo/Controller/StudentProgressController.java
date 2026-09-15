@@ -20,7 +20,6 @@ import japlearn.demo.Service.StudentProgressService;
 import japlearn.demo.Service.StudentService;
 import japlearn.demo.Service.TeacherAuthorizationService;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/progress")
 public class StudentProgressController {

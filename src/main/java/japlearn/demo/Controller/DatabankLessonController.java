@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 import japlearn.demo.Entity.DatabankLesson;
 import japlearn.demo.Service.DatabankLessonService;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/DatabankLesson")
 public class DatabankLessonController {

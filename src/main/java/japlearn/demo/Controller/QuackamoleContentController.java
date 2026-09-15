@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 import japlearn.demo.Entity.QuackamoleContent;
 import japlearn.demo.Service.QuackamoleContentService;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/quackamolecontent")
 public class QuackamoleContentController {

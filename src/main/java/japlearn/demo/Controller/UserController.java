@@ -43,9 +43,10 @@ public class UserController {
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
         try {
             japlearnService.sendForgotPasswordEmail(request.get("email"));
-            return ResponseEntity.ok(Collections.singletonMap("message", "Password reset email sent"));
+            return ResponseEntity.ok(Collections.singletonMap("message", "If the account exists, a password reset email has been sent."));
         } catch (UsernameNotFoundException ex) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.singletonMap("error", "User not found"));
+            // Do not reveal which email addresses are registered.
+            return ResponseEntity.ok(Collections.singletonMap("message", "If the account exists, a password reset email has been sent."));
         }
     }
 
@@ -206,9 +207,7 @@ public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
         response.put("role", authenticatedUser.getRole());
         response.put("portalSessionToken", portalSessionToken);
         return ResponseEntity.ok(response);
-    } catch (UsernameNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.singletonMap("error", "User not found"));
-    } catch (BadCredentialsException ex) {
+    } catch (UsernameNotFoundException | BadCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "Invalid credentials"));
     } catch (IllegalStateException ex) {
         // Expected, user-facing account states ("Email not confirmed",

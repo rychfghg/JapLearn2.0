@@ -21,7 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import japlearn.demo.Entity.DatabankLessonContent;
 import japlearn.demo.Service.DatabankLessonContentService;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/DatabankLessonContent")
 public class DatabankLessonContentController {

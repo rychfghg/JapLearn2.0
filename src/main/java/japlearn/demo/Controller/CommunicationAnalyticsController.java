@@ -20,7 +20,6 @@ import japlearn.demo.Repository.QuackTalkSessionRepository;
 import japlearn.demo.Repository.SituationalAttemptRepository;
 import japlearn.demo.Repository.ScoreRepository;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/communicationAnalytics")
 public class CommunicationAnalyticsController {

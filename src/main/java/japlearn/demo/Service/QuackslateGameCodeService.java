@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
+import java.security.SecureRandom;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -15,6 +15,7 @@ public class QuackslateGameCodeService {
 
     private final QuackslateGameCodeRepository quackslateGameCodeRepository;
     private Map<String, Boolean> quizStatusMap = new ConcurrentHashMap<>();  // Store quiz status per gameCode
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
     public QuackslateGameCodeService(QuackslateGameCodeRepository quackslateGameCodeRepository) {
@@ -24,16 +25,16 @@ public class QuackslateGameCodeService {
     // Generate a new random alphanumeric game code
     public QuackslateGameCode generateNewGameCode() {
         String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";  // Alphanumeric characters
-        StringBuilder gameCode = new StringBuilder();
-        Random random = new Random();
-
-        // Generate a 6-character random string
-        for (int i = 0; i < 6; i++) {
-            gameCode.append(characters.charAt(random.nextInt(characters.length())));
-        }
+        String candidate;
+        do {
+            StringBuilder gameCode = new StringBuilder();
+            for (int i = 0; i < 6; i++)
+                gameCode.append(characters.charAt(secureRandom.nextInt(characters.length())));
+            candidate = gameCode.toString();
+        } while (quackslateGameCodeRepository.findByGameCode(candidate).isPresent());
 
         QuackslateGameCode newGame = new QuackslateGameCode();
-        newGame.setGameCode(gameCode.toString());  // Set the generated game code
+        newGame.setGameCode(candidate);
 
         return quackslateGameCodeRepository.save(newGame);  // Save the new game to the repository
     }

@@ -19,7 +19,6 @@ import japlearn.demo.Service.QuackslateContentService;
 
 @RestController
 @RequestMapping("/api/quackslateContent")
-@CrossOrigin(origins ="*")
 public class QuackslateContentController {
 
     private final QuackslateContentService quackslateContentService;

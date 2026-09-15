@@ -21,7 +21,6 @@ import japlearn.demo.Repository.ReplyCoachAttemptRepository;
 import japlearn.demo.Repository.ScoreRepository;
 import japlearn.demo.Repository.SituationalAttemptRepository;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/quackProgress")
 public class QuackProgressController {

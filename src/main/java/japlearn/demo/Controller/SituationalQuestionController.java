@@ -36,7 +36,6 @@ import japlearn.demo.Repository.SituationalAttemptRepository;
 import japlearn.demo.Repository.SituationalQuestionRepository;
 import japlearn.demo.Repository.SituationalRunRepository;
 
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/situational")
 public class SituationalQuestionController {

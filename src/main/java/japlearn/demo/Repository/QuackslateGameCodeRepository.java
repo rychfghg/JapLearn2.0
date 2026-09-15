@@ -5,6 +5,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface QuackslateGameCodeRepository extends MongoRepository<QuackslateGameCode, String> {
@@ -12,5 +13,6 @@ public interface QuackslateGameCodeRepository extends MongoRepository<Quackslate
     // Custom method to find a game by its game code
     Optional<QuackslateGameCode> findByGameCode(String gameCode);
     QuackslateGameCode findFirstByIsActiveTrue();
+    List<QuackslateGameCode> findByOwnerTeacherEmailIgnoreCaseOrderByStartsAtDesc(String ownerTeacherEmail);
     
 }

@@ -19,7 +19,6 @@ import japlearn.demo.Service.QuackmanContentService;
 
 @RestController
 @RequestMapping("/api/quackmancontent")
-@CrossOrigin(origins = "*")
 public class QuackmanContentController {
 
     @Autowired

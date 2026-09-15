@@ -18,7 +18,6 @@ import japlearn.demo.Entity.Classes;
 import japlearn.demo.Service.ClassesService;
 import japlearn.demo.Service.TeacherAuthorizationService;
  
-@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/classes")
 public class ClassesController {

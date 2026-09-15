@@ -12,5 +12,6 @@ public interface UserRepository extends MongoRepository<User, String>{
     User findByConfirmationToken(String confirmationToken);
     List<User> findByIsEmailConfirmedTrueAndIsApprovedFalse();
     User findByResetToken(String resetToken);
+    User findByPortalSessionToken(String portalSessionToken);
     List<User> findByRoleIgnoreCase(String role);
 }
