@@ -11,10 +11,29 @@ import org.junit.jupiter.api.Test;
 import japlearn.demo.Entity.QuackslateGameCode;
 import japlearn.demo.Entity.QuackslateQuestion;
 import japlearn.demo.Repository.QuackslateQuestionRepository;
+import japlearn.demo.Repository.QuackslateContentRepository;
+import japlearn.demo.Repository.QuackslateGameCodeRepository;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
+import java.util.Optional;
 
 class QuackslateSessionServiceTest {
+    @Test
+    void unusedCodeIsDeletedButJoinedCodeKeepsItsHistory() {
+        var games = mock(QuackslateGameCodeRepository.class);
+        var content = mock(QuackslateContentRepository.class);
+        var service = new QuackslateSessionService(null, games, null, content, null, null, null);
+        var game = new QuackslateGameCode("ABCDE");
+        game.setOwnerTeacherEmail("teacher@example.com");
+        when(games.findByGameCode("ABCDE")).thenReturn(Optional.of(game));
+        when(content.findByGameCode("ABCDE")).thenReturn(List.of());
+        service.deleteSession("teacher@example.com", "abcde");
+        verify(games).delete(game);
+        game.setJoinedStudentEmails(List.of("learner@example.com"));
+        assertThrows(ResponseStatusException.class, () -> service.deleteSession("teacher@example.com", "ABCDE"));
+        verify(games, times(1)).delete(game);
+        assertThrows(ResponseStatusException.class, () -> service.deleteSession("another@example.com", "ABCDE"));
+    }
     @Test
     void bankIncludesSystemAndOwnQuestionsButNotOtherTeachers() {
         var repository = mock(QuackslateQuestionRepository.class);
