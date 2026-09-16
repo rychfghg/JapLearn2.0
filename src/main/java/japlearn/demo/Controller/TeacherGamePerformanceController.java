@@ -182,10 +182,10 @@ public class TeacherGamePerformanceController {
         for (LessonQuizAttempt item : lessonAttempts
                 .findByStudentEmailIgnoreCaseOrderBySubmittedAtDesc(email)) {
             Instant time = orEpoch(item.getSubmittedAt());
-            String title = lessons.findById(item.getLessonId()).map(Lesson::getTitle)
+            String title = lessons.findById(item.getLessonId()).map(Lesson::getLesson_title)
                     .filter(value -> value != null && !value.isBlank()).orElse("Teacher lesson");
             rows.add(new TimedAttempt(time, new AttemptView(item.getId(), "Lessons", title,
-                    item.getScore(), item.getMaxScore(), clamp(item.getPercentage()),
+                    item.getScore(), item.getMaxScore(), clamp((int) Math.round(item.getPercentage())),
                     time.toString(), "COMPLETED", "TEACHER_QUIZ", null,
                     null, null, null, null, null, List.of(), List.of(), null)));
         }
