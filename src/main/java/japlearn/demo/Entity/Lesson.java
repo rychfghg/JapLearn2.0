@@ -14,11 +14,14 @@ public class Lesson {
 	@Id
 	private String id;
 	private String classId;
+	private List<String> classIds = new ArrayList<>();
 	private String lesson_title;
 	private String lesson_type;
 	private String lesson_description;
 	private String ownerTeacherEmail;
 	private String sourceFileName;
+	private String pdfFileId;
+	private Integer pdfPageCount;
 	private List<LessonSection> sections = new ArrayList<>();
 	private List<QuizQuestion> quiz = new ArrayList<>();
 	private Integer quizTimerSeconds;
@@ -97,8 +100,12 @@ public class Lesson {
 	public void setClassId(String classId) {
 		this.classId = classId;
 	}
+	public List<String> getClassIds(){return classIds==null?List.of():classIds;}
+	public void setClassIds(List<String> value){classIds=value==null?new ArrayList<>():value;}
 	public String getOwnerTeacherEmail(){return ownerTeacherEmail;} public void setOwnerTeacherEmail(String value){ownerTeacherEmail=value;}
 	public String getSourceFileName(){return sourceFileName;} public void setSourceFileName(String value){sourceFileName=value;}
+	public String getPdfFileId(){return pdfFileId;} public void setPdfFileId(String value){pdfFileId=value;}
+	public Integer getPdfPageCount(){return pdfPageCount;} public void setPdfPageCount(Integer value){pdfPageCount=value;}
 	public List<LessonSection> getSections(){return sections==null?List.of():sections;} public void setSections(List<LessonSection> value){sections=value==null?new ArrayList<>():value;}
 	public List<QuizQuestion> getQuiz(){return quiz==null?List.of():quiz;} public void setQuiz(List<QuizQuestion> value){quiz=value==null?new ArrayList<>():value;}
 	public Integer getQuizTimerSeconds(){return quizTimerSeconds;} public void setQuizTimerSeconds(Integer value){quizTimerSeconds=value;}
