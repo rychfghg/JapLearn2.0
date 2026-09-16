@@ -25,6 +25,10 @@ import japlearn.demo.Entity.QuackTalkSession;
 import japlearn.demo.Entity.ReplyCoachAttempt;
 import japlearn.demo.Entity.Score;
 import japlearn.demo.Entity.SituationalAttempt;
+import japlearn.demo.Entity.Lesson;
+import japlearn.demo.Entity.LessonQuizAttempt;
+import japlearn.demo.Repository.LessonQuizAttemptRepository;
+import japlearn.demo.Repository.LessonRepository;
 import japlearn.demo.Repository.QuackTalkSessionRepository;
 import japlearn.demo.Repository.ReplyCoachAttemptRepository;
 import japlearn.demo.Repository.ScoreRepository;
@@ -46,17 +50,22 @@ public class TeacherGamePerformanceController {
     private final ReplyCoachAttemptRepository replyCoach;
     private final ScoreRepository scores;
     private final QuackTalkSessionRepository talk;
+    private final LessonQuizAttemptRepository lessonAttempts;
+    private final LessonRepository lessons;
 
     public TeacherGamePerformanceController(TeacherAuthorizationService authorization,
             StudentService students, SituationalAttemptRepository situational,
             ReplyCoachAttemptRepository replyCoach, ScoreRepository scores,
-            QuackTalkSessionRepository talk) {
+            QuackTalkSessionRepository talk, LessonQuizAttemptRepository lessonAttempts,
+            LessonRepository lessons) {
         this.authorization = authorization;
         this.students = students;
         this.situational = situational;
         this.replyCoach = replyCoach;
         this.scores = scores;
         this.talk = talk;
+        this.lessonAttempts = lessonAttempts;
+        this.lessons = lessons;
     }
 
     public record AttemptView(String id, String game, String activity, Integer score,
@@ -170,6 +179,16 @@ public class TeacherGamePerformanceController {
                     item.getExpressionsPracticed() == null ? List.of() : item.getExpressionsPracticed(),
                     item.getConversationTurns())));
         }
+        for (LessonQuizAttempt item : lessonAttempts
+                .findByStudentEmailIgnoreCaseOrderBySubmittedAtDesc(email)) {
+            Instant time = orEpoch(item.getSubmittedAt());
+            String title = lessons.findById(item.getLessonId()).map(Lesson::getTitle)
+                    .filter(value -> value != null && !value.isBlank()).orElse("Teacher lesson");
+            rows.add(new TimedAttempt(time, new AttemptView(item.getId(), "Lessons", title,
+                    item.getScore(), item.getMaxScore(), clamp(item.getPercentage()),
+                    time.toString(), "COMPLETED", "TEACHER_QUIZ", null,
+                    null, null, null, null, null, List.of(), List.of(), null)));
+        }
 
         rows.sort(Comparator.comparing(TimedAttempt::time).reversed());
         List<AttemptView> history = rows.stream().map(TimedAttempt::attempt).toList();
@@ -179,7 +198,8 @@ public class TeacherGamePerformanceController {
                 game(history, "QuackResponse", List.of("Reply Coach", "Response Rush", "Dialogue Relay")),
                 game(history, "Quack-a-Mole", List.of()),
                 game(history, "Quackman", List.of()),
-                game(history, "QuackSlate", List.of()));
+                game(history, "QuackSlate", List.of()),
+                game(history, "Lessons", List.of()));
         return new PerformanceView(email, history.size(), games, history);
     }
 

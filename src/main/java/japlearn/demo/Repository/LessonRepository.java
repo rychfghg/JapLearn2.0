@@ -8,4 +8,6 @@ import japlearn.demo.Entity.Lesson;
 
 public interface LessonRepository extends MongoRepository<Lesson, String>{
 	List<Lesson> findByClassId(String classId);
+	List<Lesson> findByClassIdAndPublishedTrueOrderByCreatedAtDesc(String classId);
+	List<Lesson> findByOwnerTeacherEmailIgnoreCaseOrderByCreatedAtDesc(String ownerTeacherEmail);
 }
