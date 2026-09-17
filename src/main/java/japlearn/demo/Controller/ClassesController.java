@@ -33,7 +33,11 @@ public class ClassesController {
     @PostMapping("/addClass")
     public ResponseEntity<?> addClassCode(@RequestBody Classes newClassEntity, @RequestParam String teacherEmail,
             @RequestHeader("X-Teacher-Token") String sessionToken) {
-        return classService.addClass(newClassEntity.getClassCodes(), teacherAuthorization.requireTeacher(teacherEmail, sessionToken));
+        String classTitle = newClassEntity.getClassTitle();
+        if ((classTitle == null || classTitle.isBlank()) && newClassEntity.getClassCodes() != null) {
+            classTitle = newClassEntity.getClassCodes();
+        }
+        return classService.addClass(classTitle, teacherAuthorization.requireTeacher(teacherEmail, sessionToken));
     }
  
    @DeleteMapping("/removeClass")

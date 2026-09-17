@@ -8,6 +8,7 @@ public class Classes {
     @Id
     private String id; // MongoDB's default ID
     private String classCodes; // This is your custom class code field
+    private String classTitle;
     private String ownerTeacherEmail;
  
     public Classes() {
@@ -29,6 +30,14 @@ public class Classes {
  
     public void setClassCodes(String classCodes) {
         this.classCodes = classCodes;
+    }
+
+    public String getClassTitle() {
+        return classTitle;
+    }
+
+    public void setClassTitle(String classTitle) {
+        this.classTitle = classTitle;
     }
 
     public String getOwnerTeacherEmail() {
