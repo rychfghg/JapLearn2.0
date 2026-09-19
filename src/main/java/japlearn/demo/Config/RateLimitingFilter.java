@@ -58,7 +58,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     // Keep ordinary gameplay and queued offline-score synchronization usable
     // for classrooms whose devices share one public IP. Expensive speech and
     // authentication routes retain the much tighter limits above.
-    private static final int[] DEFAULT_LIMIT = {600, 60};
+    // Per IP: a whole classroom shares one Wi-Fi IP, so this must cover ~40 devices polling.
+    private static final int[] DEFAULT_LIMIT = {6000, 60};
 
     private static final int MAX_TRACKED_KEYS = 20_000;
 

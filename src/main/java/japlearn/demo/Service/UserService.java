@@ -43,6 +43,9 @@ public class UserService {
     @Value("${app.student-web-url}")
     private String studentWebUrl;
 
+    @Value("${app.portal-web-url:https://portal.japlearn.com}")
+    private String portalWebUrl;
+
     @Value("${app.mail.from-address}")
     private String mailFromAddress;
     
@@ -76,14 +79,18 @@ public class UserService {
         userRepository.save(user);
 
         // Send reset email
-        sendPasswordResetEmail(user.getEmail(), resetToken);
+        boolean isTeacher = "teacher".equalsIgnoreCase(user.getRole());
+        sendPasswordResetEmail(user.getEmail(), resetToken, isTeacher);
 
         return "success";
     }
 
     // Send reset password email
-private void sendPasswordResetEmail(String email, String token) {
-    String resetUrl = studentWebUrl + "/ResetPassword?token=" + token;
+private void sendPasswordResetEmail(String email, String token, boolean isTeacher) {
+    // Teachers reset inside the teacher portal so they land back on the teacher login.
+    String resetUrl = isTeacher
+            ? portalWebUrl + "/teacher/reset-password?token=" + token
+            : studentWebUrl + "/ResetPassword?token=" + token;
 
     MimeMessage mimeMessage = mailSender.createMimeMessage();
     try {
