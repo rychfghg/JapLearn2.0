@@ -19,9 +19,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.RequestHeader;
+
 import japlearn.demo.DTO.LoginRequest;
 import japlearn.demo.Entity.User;
+import japlearn.demo.Service.AccountDeletionService;
+import japlearn.demo.Service.StudentAuthorizationService;
 import japlearn.demo.Service.UserService;
+import japlearn.demo.Service.WebAccountDeletionService;
 
 // CORS is now handled once, globally, in SecurityConfig's allow-listed
 // CorsConfigurationSource — the old @CrossOrigin(origins = "*") on this
@@ -32,10 +37,82 @@ import japlearn.demo.Service.UserService;
 public class UserController {
 
     private final UserService japlearnService;
+    private final StudentAuthorizationService studentAuthorization;
+    private final AccountDeletionService accountDeletion;
+    private final WebAccountDeletionService webAccountDeletion;
 
     @Autowired
-    public UserController(UserService japlearnService) {
+    public UserController(UserService japlearnService,
+            StudentAuthorizationService studentAuthorization,
+            AccountDeletionService accountDeletion,
+            WebAccountDeletionService webAccountDeletion) {
         this.japlearnService = japlearnService;
+        this.studentAuthorization = studentAuthorization;
+        this.accountDeletion = accountDeletion;
+        this.webAccountDeletion = webAccountDeletion;
+    }
+
+    /**
+     * Step 1 of the public web deletion page: emails the owner a confirmation
+     * link, or refers teacher accounts to the JapLearn team for review.
+     */
+    @PostMapping("/request-account-deletion")
+    public ResponseEntity<?> requestAccountDeletion(@RequestBody Map<String, String> request) {
+        WebAccountDeletionService.Outcome outcome = webAccountDeletion.requestDeletion(request.get("email"));
+        // Never reveal whether an address is registered.
+        return ResponseEntity.ok(Map.of(
+                "status", outcome == WebAccountDeletionService.Outcome.MANUAL_REVIEW ? "review" : "sent",
+                "message", outcome == WebAccountDeletionService.Outcome.MANUAL_REVIEW
+                        ? "This account needs a quick review by the JapLearn team. We will contact you by email."
+                        : "If that account exists, we have emailed a confirmation link that expires in 30 minutes."));
+    }
+
+    /** Lets the confirmation page show which account the link belongs to. */
+    @GetMapping("/account-deletion-request")
+    public ResponseEntity<?> accountDeletionRequest(@RequestParam("token") String token) {
+        User user = webAccountDeletion.findByDeletionToken(token);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.GONE)
+                    .body(Collections.singletonMap("message", "This link is invalid, already used, or expired."));
+        }
+        return ResponseEntity.ok(Map.of("email", user.getEmail(), "name",
+                String.valueOf(user.getFname() == null ? "" : user.getFname())));
+    }
+
+    /** Step 2: the emailed link was opened and DELETE was typed. */
+    @PostMapping("/confirm-account-deletion")
+    public ResponseEntity<?> confirmAccountDeletion(@RequestParam("token") String token,
+            @RequestBody Map<String, String> request) {
+        boolean deleted = webAccountDeletion.confirmDeletion(token, request.get("confirmation"));
+        if (!deleted) {
+            return ResponseEntity.status(HttpStatus.GONE).body(Collections.singletonMap("message",
+                    "This link is invalid, already used, or expired. Request a new one to continue."));
+        }
+        return ResponseEntity.ok(Collections.singletonMap("message",
+                "Your JapLearn account and learning records have been permanently deleted."));
+    }
+
+    /**
+     * Permanently deletes the signed-in learner's account and records.
+     * Required by Google Play for apps that offer account creation.
+     */
+    @DeleteMapping("/delete-account")
+    public ResponseEntity<?> deleteAccount(@RequestParam("email") String email,
+            @RequestHeader("X-Student-Token") String token,
+            @RequestBody(required = false) Map<String, String> request) {
+        // Only the signed-in owner of this account may delete it.
+        String owner = studentAuthorization.requireStudent(email, token);
+
+        String confirmation = request == null ? "" : String.valueOf(request.getOrDefault("confirmation", "")).trim();
+        if (!"DELETE".equalsIgnoreCase(confirmation)) {
+            return ResponseEntity.badRequest()
+                    .body(Collections.singletonMap("message", "Type DELETE to confirm removing this account."));
+        }
+
+        long removed = accountDeletion.deleteLearnerAccount(owner);
+        return ResponseEntity.ok(Map.of(
+                "message", "Your JapLearn account and learning records have been deleted.",
+                "recordsRemoved", removed));
     }
 
 

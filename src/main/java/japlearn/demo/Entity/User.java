@@ -38,6 +38,11 @@ public class User {
     private String portalSessionToken;
     @JsonIgnore
     private LocalDateTime portalSessionExpiresAt;
+    // Confirms a web account-deletion request made from the public page.
+    @JsonIgnore
+    private String deletionToken;
+    @JsonIgnore
+    private LocalDateTime deletionTokenExpiry;
 
     public User() {
     }
@@ -103,6 +108,10 @@ public class User {
     public void setPortalSessionToken(String portalSessionToken) { this.portalSessionToken = portalSessionToken; }
     public LocalDateTime getPortalSessionExpiresAt() { return portalSessionExpiresAt; }
     public void setPortalSessionExpiresAt(LocalDateTime portalSessionExpiresAt) { this.portalSessionExpiresAt = portalSessionExpiresAt; }
+    public String getDeletionToken() { return deletionToken; }
+    public void setDeletionToken(String deletionToken) { this.deletionToken = deletionToken; }
+    public LocalDateTime getDeletionTokenExpiry() { return deletionTokenExpiry; }
+    public void setDeletionTokenExpiry(LocalDateTime deletionTokenExpiry) { this.deletionTokenExpiry = deletionTokenExpiry; }
 
     // Other Getters and Setters remain unchanged
 
