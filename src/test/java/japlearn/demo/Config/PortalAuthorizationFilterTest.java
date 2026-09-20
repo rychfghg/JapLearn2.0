@@ -46,6 +46,25 @@ class PortalAuthorizationFilterTest {
         assertThat(optionsChain.getRequest()).isNotNull();
     }
 
+    @Test void allowsAccountDeletionWithoutAPortalSession() throws Exception {
+        // The public deletion page and the in-app delete button are not
+        // administrator actions, so they must pass this filter untouched.
+        PortalAuthorizationFilter filter = new PortalAuthorizationFilter(mock(UserRepository.class));
+        String[][] routes = {
+            {"POST", "/api/users/request-account-deletion"},
+            {"POST", "/api/users/confirm-account-deletion"},
+            {"GET", "/api/users/account-deletion-request"},
+            {"DELETE", "/api/users/delete-account"},
+        };
+        for (String[] route : routes) {
+            MockFilterChain chain = new MockFilterChain();
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            filter.doFilter(new MockHttpServletRequest(route[0], route[1]), response, chain);
+            assertThat(chain.getRequest()).as("%s %s should reach the controller", route[0], route[1]).isNotNull();
+            assertThat(response.getStatus()).isEqualTo(200);
+        }
+    }
+
     private User user(String role, String token) {
         User user = new User();
         user.setRole(role);
