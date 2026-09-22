@@ -78,6 +78,8 @@ public class PortalAuthorizationFilter extends OncePerRequestFilter {
                 || path.equals("/api/users/confirm-account-deletion")
                 || path.equals("/api/users/account-deletion-request")
                 || path.equals("/api/users/delete-account")) return false;
+        // Admin-only management routes, for every method including reads.
+        if (path.startsWith("/api/admin/")) return true;
         if (path.equals("/api/users") && HttpMethod.GET.matches(method)) return true;
         if (path.startsWith("/api/users/pending-approval") || path.startsWith("/api/users/approve/")
                 || path.startsWith("/api/users/admin-create")) return true;

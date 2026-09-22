@@ -65,6 +65,29 @@ class PortalAuthorizationFilterTest {
         }
     }
 
+    @Test void restrictsStudentClassRoutesToAdministrators() throws Exception {
+        UserRepository repository = mock(UserRepository.class);
+        when(repository.findByPortalSessionToken("teacher-token")).thenReturn(user("teacher", "teacher-token"));
+        when(repository.findByPortalSessionToken("admin-token")).thenReturn(user("admin", "admin-token"));
+        PortalAuthorizationFilter filter = new PortalAuthorizationFilter(repository);
+
+        MockHttpServletResponse anonymous = new MockHttpServletResponse();
+        filter.doFilter(new MockHttpServletRequest("GET", "/api/admin/student-classes"), anonymous, new MockFilterChain());
+        assertThat(anonymous.getStatus()).isEqualTo(401);
+
+        MockHttpServletRequest teacherRequest = new MockHttpServletRequest("PUT", "/api/admin/student-classes/abc");
+        teacherRequest.addHeader("X-Teacher-Token", "teacher-token");
+        MockHttpServletResponse teacher = new MockHttpServletResponse();
+        filter.doFilter(teacherRequest, teacher, new MockFilterChain());
+        assertThat(teacher.getStatus()).isEqualTo(403);
+
+        MockHttpServletRequest adminRequest = new MockHttpServletRequest("GET", "/api/admin/student-classes");
+        adminRequest.addHeader("X-Portal-Token", "admin-token");
+        MockFilterChain adminChain = new MockFilterChain();
+        filter.doFilter(adminRequest, new MockHttpServletResponse(), adminChain);
+        assertThat(adminChain.getRequest()).isNotNull();
+    }
+
     private User user(String role, String token) {
         User user = new User();
         user.setRole(role);
