@@ -25,6 +25,8 @@ services:
         value: https://japlearn.com
       - key: APP_PORTAL_WEB_URL
         value: https://portal.japlearn.com
+      - key: JAPLEARN_PROXY_SECRET
+        sync: false
       - key: AZURE_SPEECH_KEY
         sync: false
       - key: AZURE_SPEECH_REGION

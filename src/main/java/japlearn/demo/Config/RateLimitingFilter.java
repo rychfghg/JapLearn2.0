@@ -1,11 +1,14 @@
 package japlearn.demo.Config;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
@@ -69,6 +72,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
+    // Shared with the portal's /api proxy (JAPLEARN_PROXY_SECRET). Blank disables proxy trust.
+    @Value("${app.proxy-shared-secret:}")
+    private String proxySecret = "";
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -113,7 +120,21 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         buckets.entrySet().removeIf(entry -> nowSeconds - entry.getValue().windowStartEpochSeconds > 600);
     }
 
-    private String clientIp(HttpServletRequest request) {
+    String clientIp(HttpServletRequest request) {
+        // Requests relayed by the portal's /api proxy on Vercel all arrive from
+        // Vercel's addresses. The proxy passes the real client IP together with
+        // a shared secret; the IP is trusted only when that secret matches, so
+        // a caller contacting Render directly cannot forge it.
+        String proxiedIp = request.getHeader("X-JapLearn-Client-IP");
+        String presentedSecret = request.getHeader("X-JapLearn-Proxy-Secret");
+        if (proxySecret != null && !proxySecret.isBlank()
+                && proxiedIp != null && !proxiedIp.isBlank()
+                && presentedSecret != null
+                && MessageDigest.isEqual(proxySecret.getBytes(StandardCharsets.UTF_8),
+                        presentedSecret.getBytes(StandardCharsets.UTF_8))) {
+            return proxiedIp.trim();
+        }
+
         // server.forward-headers-strategy=native delegates trusted-proxy
         // parsing to Tomcat. Do not parse a client-supplied X-Forwarded-For
         // value here because it can be forged when the origin is contacted
