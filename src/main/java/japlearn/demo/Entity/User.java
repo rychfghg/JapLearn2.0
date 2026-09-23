@@ -25,7 +25,7 @@ public class User {
     private String confirmationToken;
     private boolean isEmailConfirmed = false;
     
-    // New field to track if the user has been approved by the teacher
+    // Tracks whether the JapLearn admin has approved the account.
     private boolean isApproved = false;
     @JsonIgnore
     private String resetToken;

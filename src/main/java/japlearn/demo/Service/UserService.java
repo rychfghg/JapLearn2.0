@@ -469,7 +469,7 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
         }
 
         // Self-created teacher accounts must confirm their email too. Student
-        // accounts retain the existing teacher-approval requirement.
+        // accounts retain the existing JapLearn admin approval requirement.
         if (!"admin".equalsIgnoreCase(user.getRole()) && !user.isEmailConfirmed()) {
             throw new IllegalStateException("Email not confirmed");
         }
