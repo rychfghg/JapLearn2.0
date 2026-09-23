@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import japlearn.demo.DTO.LoginRequest;
 import japlearn.demo.Entity.User;
 import japlearn.demo.Service.AccountDeletionService;
+import japlearn.demo.Service.LoginAttemptLimiter;
 import japlearn.demo.Service.StudentAuthorizationService;
 import japlearn.demo.Service.UserService;
 import japlearn.demo.Service.WebAccountDeletionService;
@@ -40,16 +41,19 @@ public class UserController {
     private final StudentAuthorizationService studentAuthorization;
     private final AccountDeletionService accountDeletion;
     private final WebAccountDeletionService webAccountDeletion;
+    private final LoginAttemptLimiter loginAttempts;
 
     @Autowired
     public UserController(UserService japlearnService,
             StudentAuthorizationService studentAuthorization,
             AccountDeletionService accountDeletion,
-            WebAccountDeletionService webAccountDeletion) {
+            WebAccountDeletionService webAccountDeletion,
+            LoginAttemptLimiter loginAttempts) {
         this.japlearnService = japlearnService;
         this.studentAuthorization = studentAuthorization;
         this.accountDeletion = accountDeletion;
         this.webAccountDeletion = webAccountDeletion;
+        this.loginAttempts = loginAttempts;
     }
 
     /**
@@ -272,8 +276,15 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
 
     @PostMapping("/login")
 public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
+    String email = loginRequest.getEmail();
+    if (loginAttempts.isBlocked(email)) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", "60")
+                .body(Collections.singletonMap("error", "Too many incorrect attempts for this account. Please try again in a minute."));
+    }
     try {
-        User authenticatedUser = japlearnService.authenticate(loginRequest.getEmail(), loginRequest.getPassword());
+        User authenticatedUser = japlearnService.authenticate(email, loginRequest.getPassword());
+        loginAttempts.clear(email);
         String portalSessionToken = authenticatedUser.getPortalSessionToken();
         authenticatedUser.setPassword(null); 
         Map<String, Object> response = new java.util.LinkedHashMap<>();
@@ -285,6 +296,7 @@ public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
         response.put("portalSessionToken", portalSessionToken);
         return ResponseEntity.ok(response);
     } catch (UsernameNotFoundException | BadCredentialsException ex) {
+        loginAttempts.recordFailure(email);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "Invalid credentials"));
     } catch (IllegalStateException ex) {
         // Expected, user-facing account states ("Email not confirmed",

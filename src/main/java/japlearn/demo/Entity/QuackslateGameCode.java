@@ -1,6 +1,7 @@
 package japlearn.demo.Entity;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -11,10 +12,12 @@ public class QuackslateGameCode {
 
     @Id
     private String id;
+    @Indexed
     private String gameCode;
     private String content;
     private int currentQuestionIndex = 0;
     private boolean isActive;
+    @Indexed
     private String ownerTeacherEmail;
     private List<String> questionIds = new ArrayList<>();
     private List<String> joinedStudentEmails = new ArrayList<>();

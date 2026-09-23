@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import japlearn.demo.Entity.Student;
 import japlearn.demo.Service.StudentService;
+import japlearn.demo.Service.LoginAttemptLimiter;
 import japlearn.demo.Service.TeacherAuthorizationService;
 
 @RestController
@@ -29,14 +30,17 @@ public class StudentController {
 
     private final StudentService studentService;
     private final TeacherAuthorizationService teacherAuthorization;
+    private final LoginAttemptLimiter loginAttempts;
     
 
 
 
     @Autowired
-    public StudentController(StudentService studentService, TeacherAuthorizationService teacherAuthorization) {
+    public StudentController(StudentService studentService, TeacherAuthorizationService teacherAuthorization,
+            LoginAttemptLimiter loginAttempts) {
         this.studentService = studentService;
         this.teacherAuthorization = teacherAuthorization;
+        this.loginAttempts = loginAttempts;
     }
 
 
@@ -95,12 +99,19 @@ public ResponseEntity<List<Student>> getAllStudents(@RequestParam(required = fal
     public ResponseEntity<Object> login(@RequestBody Map<String, String> payload) {
         String email = payload.get("email");
         String password = payload.get("password");
+        if (loginAttempts.isBlocked(email)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header("Retry-After", "60")
+                    .body(Map.of("error", "Too many incorrect attempts for this account. Please try again in a minute."));
+        }
         Student student = studentService.verifyCredentials(email, password);
     
         if (student != null) {
+            loginAttempts.clear(email);
             student.setPassword(null);
             return ResponseEntity.ok(student);
         } else {
+            loginAttempts.recordFailure(email);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid email or password.");
         }
     }

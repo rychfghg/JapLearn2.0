@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -15,6 +16,7 @@ public class User {
     private String id;
     private String fname;
     private String lname;
+    @Indexed
     private String email;
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
@@ -34,6 +36,8 @@ public class User {
     private LocalDate dailyGoalMinutesDate;
     private int dailyGoalMinutes;
     private boolean guidedPhraseEnabled = false;
+    // Looked up on every authenticated portal request.
+    @Indexed
     @JsonIgnore
     private String portalSessionToken;
     @JsonIgnore

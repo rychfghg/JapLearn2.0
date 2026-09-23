@@ -2,14 +2,22 @@ package japlearn.demo.Entity;
 
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 @Document(collection = "scores")
+@CompoundIndexes({
+    @CompoundIndex(name = "score_email_attempt", def = "{'email':1,'clientAttemptId':1}"),
+    @CompoundIndex(name = "score_session_sheet", def = "{'gameCode':1,'game':1,'mode':1}")
+})
 public class Score {
     @Id
     private String id; // MongoDB's default ID
     private String name;
+    @Indexed
     private String email;
     private String date;
     private String game;

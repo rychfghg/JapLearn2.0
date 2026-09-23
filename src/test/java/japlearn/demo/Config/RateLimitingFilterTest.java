@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockFilterChain;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class RateLimitingFilterTest {
@@ -33,5 +35,15 @@ class RateLimitingFilterTest {
 
     @Test void neverTrustsTheHeaderWhenNoSecretIsConfigured() {
         assertThat(filter("").clientIp(relayed("203.0.113.7", ""))).isEqualTo("76.76.21.21");
+    }
+
+    @Test void oneSharedCarrierIpCanServeFortyLoginRequests() throws Exception {
+        RateLimitingFilter limiter = filter("");
+        for (int i = 0; i < 40; i++) {
+            MockHttpServletRequest request = relayed(null, null);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            limiter.doFilter(request, response, new MockFilterChain());
+            assertThat(response.getStatus()).isEqualTo(200);
+        }
     }
 }

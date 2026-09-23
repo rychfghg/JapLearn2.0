@@ -45,7 +45,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     // path -> {requests allowed, window length in seconds}
     private static final Map<String, int[]> SENSITIVE_LIMITS = Map.ofEntries(
-        Map.entry("/api/users/login", new int[]{10, 60}),
+        // Classroom sign-ins can share a carrier IP. Repeated failures for
+        // one account are capped separately by LoginAttemptLimiter.
+        Map.entry("/api/users/login", new int[]{100, 60}),
+        Map.entry("/api/students/login", new int[]{100, 60}),
         Map.entry("/api/users/register", new int[]{6, 60}),
         Map.entry("/api/users/register-teacher", new int[]{6, 60}),
         Map.entry("/api/users/forgot-password", new int[]{5, 60}),
