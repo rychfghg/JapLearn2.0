@@ -51,6 +51,8 @@ public class UserService {
     
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
+    @Autowired
+    private RegistrationSettingsService registrationSettings;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender; // Add JavaMailSender for sending emails
 
@@ -361,7 +363,8 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
                 user.setRole(ALLOWED_SELF_REGISTER_ROLES.contains(requestedRole) ? requestedRole : "student");
                 user.setId(null);
                 user.setEmail(email);
-                user.setApproved(false);
+                // Students are auto-approved only when the admin has switched that on; teachers always wait.
+                user.setApproved("student".equals(user.getRole()) && registrationSettings.isStudentAutoApprove());
                 user.setEmailConfirmed(false);
                 user.setResetToken(null);
                 user.setResetTokenExpiry(null);
