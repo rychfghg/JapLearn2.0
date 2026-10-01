@@ -42,6 +42,8 @@ public class SituationalQuestionController {
     private final SituationalQuestionRepository questions;
     private final SituationalAttemptRepository attempts;
     private final SituationalRunRepository runs;
+    @org.springframework.beans.factory.annotation.Autowired
+    private japlearn.demo.Service.StudentAuthorizationService studentAuth;
     private final GridFsTemplate gridFsTemplate;
     private final GridFsOperations gridFsOperations;
 
@@ -191,7 +193,9 @@ public class SituationalQuestionController {
     @DeleteMapping("/runs/current")
     public ResponseEntity<Void> clearCurrentRun(
             @RequestParam String email,
-            @RequestParam(defaultValue = "RECOGNITION") String gameType) {
+            @RequestParam(defaultValue = "RECOGNITION") String gameType,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Student-Token", required = false) String token) {
+        studentAuth.requireOwnStudent(email, token);
         runs.deleteByEmailIgnoreCaseAndGameTypeIgnoreCase(email, gameType);
         return ResponseEntity.noContent().build();
     }

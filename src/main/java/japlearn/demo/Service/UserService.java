@@ -482,8 +482,15 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             }
         }
 
-        if ("teacher".equalsIgnoreCase(user.getRole()) || "admin".equalsIgnoreCase(user.getRole())
-                || "student".equalsIgnoreCase(user.getRole())) {
+        if ("student".equalsIgnoreCase(user.getRole())) {
+            // Keep a still-valid session so a second device does not sign out the first one.
+            LocalDateTime now = LocalDateTime.now(JAPLEARN_TIME_ZONE);
+            boolean stillValid = user.getPortalSessionToken() != null && user.getPortalSessionExpiresAt() != null
+                    && now.isBefore(user.getPortalSessionExpiresAt());
+            if (!stillValid) user.setPortalSessionToken(UUID.randomUUID().toString());
+            user.setPortalSessionExpiresAt(now.plusDays(StudentAuthorizationService.STUDENT_SESSION_DAYS));
+            userRepository.save(user);
+        } else if ("teacher".equalsIgnoreCase(user.getRole()) || "admin".equalsIgnoreCase(user.getRole())) {
             user.setPortalSessionToken(UUID.randomUUID().toString());
             user.setPortalSessionExpiresAt(LocalDateTime.now(JAPLEARN_TIME_ZONE).plusHours(12));
             userRepository.save(user);

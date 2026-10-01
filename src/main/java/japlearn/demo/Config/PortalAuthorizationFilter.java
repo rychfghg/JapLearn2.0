@@ -85,6 +85,9 @@ public class PortalAuthorizationFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/users/admin-create")) return true;
         if (path.matches("/api/users/[^/]+(/guided-phrase-access)?")
                 && !HttpMethod.GET.matches(method)) return true;
+        // Destructive score/progress deletes: nothing in the app or portal calls these, so admin only.
+        if (HttpMethod.DELETE.matches(method) && (path.equals("/api/scores/delete")
+                || path.equals("/api/scores/deleteByDate") || path.startsWith("/api/progress/"))) return true;
         return path.equals("/api/quackTalkSessions/all")
                 || path.equals("/api/dialogue-relay/bonus/assessments");
     }

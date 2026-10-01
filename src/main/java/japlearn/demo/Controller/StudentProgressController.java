@@ -29,6 +29,7 @@ public class StudentProgressController {
 
     @Autowired private StudentService studentService;
     @Autowired private TeacherAuthorizationService teacherAuthorization;
+    @Autowired private japlearn.demo.Service.StudentAuthorizationService studentAuthorization;
 
     @GetMapping
     public List<StudentProgress> getAllProgress() {
@@ -68,7 +69,9 @@ public class StudentProgressController {
     public StudentProgress updateSingleField(
             @PathVariable String email,
             @RequestParam String field,  // Name of the field to update
-            @RequestParam boolean value) {  // New value for the field (true/false)
+            @RequestParam boolean value,  // New value for the field (true/false)
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Student-Token", required = false) String token) {
+        studentAuthorization.requireOwnStudent(email, token);
         return studentProgressService.updateSingleField(email, field, value);
     }
 

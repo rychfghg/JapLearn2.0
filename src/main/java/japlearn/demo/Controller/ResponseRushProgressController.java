@@ -3,7 +3,10 @@ package japlearn.demo.Controller;
 import java.time.Instant;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestHeader;
+import japlearn.demo.Service.StudentAuthorizationService;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +23,8 @@ import japlearn.demo.Repository.ResponseRushProgressRepository;
 @RequestMapping("/api/response-rush/progress")
 public class ResponseRushProgressController {
     private final ResponseRushProgressRepository progress;
+    @Autowired
+    private StudentAuthorizationService studentAuth;
 
     public ResponseRushProgressController(ResponseRushProgressRepository progress) {
         this.progress = progress;
@@ -55,8 +60,10 @@ public class ResponseRushProgressController {
     }
 
     @DeleteMapping
-    public ResponseEntity<Void> clear(@RequestParam String email) {
+    public ResponseEntity<Void> clear(@RequestParam String email,
+            @RequestHeader(value = "X-Student-Token", required = false) String token) {
         if (email == null || email.isBlank()) return ResponseEntity.badRequest().build();
+        studentAuth.requireOwnStudent(email, token);
         progress.deleteByEmailIgnoreCase(email.trim());
         return ResponseEntity.noContent().build();
     }

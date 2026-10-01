@@ -31,6 +31,8 @@ public class StudentController {
     private final StudentService studentService;
     private final TeacherAuthorizationService teacherAuthorization;
     private final LoginAttemptLimiter loginAttempts;
+    @Autowired
+    private japlearn.demo.Service.StudentAuthorizationService studentAuthorization;
     
 
 
@@ -47,7 +49,12 @@ public class StudentController {
     @PostMapping("/joinClass")
     public ResponseEntity<String> joinClass(@RequestParam String email, @RequestParam String classCode,
             @RequestParam(required = false) String teacherEmail,
-            @RequestHeader(value = "X-Teacher-Token", required = false) String sessionToken) {
+            @RequestHeader(value = "X-Teacher-Token", required = false) String sessionToken,
+            @RequestHeader(value = "X-Student-Token", required = false) String studentToken) {
+    // Without a teacher, only the student themself may join (token checked; lenient during rollout).
+    if (teacherEmail == null) {
+        studentAuthorization.requireOwnStudent(email, studentToken);
+    }
     boolean success = teacherEmail == null
             ? studentService.joinClassCodeByEmail(email, classCode)
             : studentService.joinClassCodeByTeacher(teacherAuthorization.requireTeacher(teacherEmail, sessionToken), email, classCode);
@@ -119,13 +126,15 @@ public ResponseEntity<List<Student>> getAllStudents(@RequestParam(required = fal
     @DeleteMapping("/removeStudent")
     public ResponseEntity<String> removeStudent(@RequestBody Map<String, String> payload,
             @RequestHeader(value = "X-Teacher-Token", required = false) String sessionToken) {
+        String teacherEmail = payload.get("teacherEmail");
+        // Only the teacher who owns the class may remove a student; there is no anonymous path.
+        if (teacherEmail == null || teacherEmail.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Teacher sign-in is required.");
+        }
         String classCode = payload.get("classCode");
         String fname = payload.get("name").split(" ")[0];
         String lname = payload.get("name").split(" ")[1];
-        String teacherEmail = payload.get("teacherEmail");
-        boolean success = teacherEmail == null
-                ? studentService.removeStudentByFullName(classCode, fname, lname)
-                : studentService.removeStudentByTeacher(teacherAuthorization.requireTeacher(teacherEmail, sessionToken), classCode, fname, lname);
+        boolean success = studentService.removeStudentByTeacher(teacherAuthorization.requireTeacher(teacherEmail, sessionToken), classCode, fname, lname);
     
         if (success) {
             return ResponseEntity.ok("Successfully removed the student.");
