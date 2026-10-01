@@ -49,7 +49,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         // one account are capped separately by LoginAttemptLimiter.
         Map.entry("/api/users/login", new int[]{100, 60}),
         Map.entry("/api/students/login", new int[]{100, 60}),
-        Map.entry("/api/users/register", new int[]{6, 60}),
+        // A classroom may register ~40 learners behind one public IP.
+        Map.entry("/api/users/register", new int[]{60, 60}),
         Map.entry("/api/users/register-teacher", new int[]{6, 60}),
         Map.entry("/api/users/forgot-password", new int[]{5, 60}),
         Map.entry("/api/users/reset-password", new int[]{10, 60}),
