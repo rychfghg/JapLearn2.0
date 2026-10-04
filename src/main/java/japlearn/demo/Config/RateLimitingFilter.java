@@ -58,6 +58,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         // Each address also has its own cooldown (EmailActionLimiter).
         Map.entry("/api/users/forgot-password", new int[]{10, 600}),
         Map.entry("/api/users/reset-password", new int[]{10, 60}),
+        Map.entry("/api/security/admin-visit", new int[]{10, 600}),
         Map.entry("/api/users/delete-account", new int[]{5, 60}),
         Map.entry("/api/users/request-account-deletion", new int[]{5, 600}),
         Map.entry("/api/users/confirm-account-deletion", new int[]{10, 60}),

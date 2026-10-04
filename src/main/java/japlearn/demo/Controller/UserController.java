@@ -46,6 +46,17 @@ public class UserController {
     private japlearn.demo.Service.EmailActionLimiter emailActions;
     @Autowired
     private japlearn.demo.Service.RegistrationGuard registrationGuard;
+    @Autowired
+    private japlearn.demo.Service.AdminAlertService adminAlerts;
+    @Autowired
+    private japlearn.demo.Repository.UserRepository userRepository;
+
+    // Server-side only: used to decide whether a failed sign-in should alert the owner.
+    private boolean isAdminAccount(String email) {
+        if (email == null || email.isBlank()) return false;
+        User u = userRepository.findByEmail(email.trim().toLowerCase(java.util.Locale.ROOT));
+        return u != null && "admin".equalsIgnoreCase(u.getRole());
+    }
 
     @Autowired
     public UserController(UserService japlearnService,
@@ -216,7 +227,7 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
         // Block throw-away inboxes, fake domains and sign-up floods before anything is saved or emailed.
         japlearn.demo.Service.RegistrationGuard.Verdict verdict = registrationGuard.check(user == null ? null : user.getEmail(), user == null ? null : user.getRole());
         if (verdict == japlearn.demo.Service.RegistrationGuard.Verdict.NOT_ALLOWED) {
-            return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Email must be a valid Gmail or CIT email."));
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Please use a valid Gmail address."));
         }
         if (verdict == japlearn.demo.Service.RegistrationGuard.Verdict.DISPOSABLE || verdict == japlearn.demo.Service.RegistrationGuard.Verdict.BAD_DOMAIN) {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error",
@@ -276,8 +287,9 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
 
 
     @PostMapping("/login")
-public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
+public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest, jakarta.servlet.http.HttpServletRequest httpRequest) {
     String email = loginRequest.getEmail();
+    boolean adminAccount = isAdminAccount(email);
     if (loginAttempts.isBlocked(email)) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header("Retry-After", "60")
@@ -295,9 +307,11 @@ public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
         response.put("lname", authenticatedUser.getLname());
         response.put("role", authenticatedUser.getRole());
         response.put("portalSessionToken", portalSessionToken);
+        if ("admin".equalsIgnoreCase(authenticatedUser.getRole())) adminAlerts.alert(japlearn.demo.Service.AdminAlertService.Event.SIGNED_IN, httpRequest, "/admin/login");
         return ResponseEntity.ok(response);
     } catch (UsernameNotFoundException | BadCredentialsException ex) {
         loginAttempts.recordFailure(email);
+        if (adminAccount) adminAlerts.alert(japlearn.demo.Service.AdminAlertService.Event.FAILED_SIGN_IN, httpRequest, "/admin/login");
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "Invalid credentials"));
     } catch (IllegalStateException ex) {
         // Expected, user-facing account states ("Email not confirmed",

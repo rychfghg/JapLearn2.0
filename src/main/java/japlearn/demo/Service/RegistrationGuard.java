@@ -53,18 +53,18 @@ public class RegistrationGuard {
     private final Deque<Long> recent = new ArrayDeque<>();
     private final ConcurrentHashMap<String, Boolean> domainCache = new ConcurrentHashMap<>();
 
-    // Same rule the app's sign-up form shows ("Gmail or CIT email"), now enforced on the server
-    // so it cannot be skipped by calling the API directly. Comma-separated; blank = any domain.
-    @Value("${app.registration.student-domains:gmail.com,cit.edu}")
-    private String studentDomains = "gmail.com,cit.edu";
+    // Only these email domains can self-register (students AND teachers), enforced on the
+    // server so it cannot be skipped by calling the API directly. Comma-separated.
+    // Accounts the admin creates in the portal are not affected.
+    @Value("${app.registration.allowed-domains:gmail.com,cit.edu}")
+    private String allowedDomains = "gmail.com,cit.edu";
 
     public Verdict check(String email, String role) {
         String domain = domainOf(email);
         if (domain.isEmpty()) return Verdict.BAD_DOMAIN;
-        if (!"teacher".equalsIgnoreCase(role)) {
-            Set<String> allowed = Arrays.stream(studentDomains.split(",")).map((d) -> d.trim().toLowerCase(Locale.ROOT)).filter((d) -> !d.isEmpty()).collect(Collectors.toSet());
-            if (!allowed.isEmpty() && !allowed.contains(domain)) return Verdict.NOT_ALLOWED;
-        }
+        Set<String> allowed = Arrays.stream(allowedDomains.split(",")).map((d) -> d.trim().toLowerCase(Locale.ROOT)).filter((d) -> !d.isEmpty()).collect(Collectors.toSet());
+        if (allowed.isEmpty()) allowed = Set.of("gmail.com", "cit.edu"); // never fall back to "any domain"
+        if (!allowed.contains(domain)) return Verdict.NOT_ALLOWED;
         if (isDisposable(domain)) return Verdict.DISPOSABLE;
         if (!canReceiveMail(domain)) return Verdict.BAD_DOMAIN;
         if (!takeSlot()) return Verdict.BUSY;

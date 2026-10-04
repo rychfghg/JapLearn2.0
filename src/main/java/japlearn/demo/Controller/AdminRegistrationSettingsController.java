@@ -24,15 +24,18 @@ public class AdminRegistrationSettingsController {
 
     @GetMapping
     public Map<String, Object> get() {
-        return Map.of("studentAutoApprove", settings.isStudentAutoApprove());
+        return Map.of("studentAutoApprove", settings.isStudentAutoApprove(),
+                "teacherAutoApprove", settings.isTeacherAutoApprove());
     }
 
+    /** Accepts either or both of studentAutoApprove / teacherAutoApprove. */
     @PutMapping
     public ResponseEntity<?> update(@RequestBody Map<String, Object> request) {
-        if (request == null || !request.containsKey("studentAutoApprove")) {
-            return ResponseEntity.badRequest().body(Map.of("error", "studentAutoApprove is required."));
+        if (request == null || !(request.containsKey("studentAutoApprove") || request.containsKey("teacherAutoApprove"))) {
+            return ResponseEntity.badRequest().body(Map.of("error", "studentAutoApprove or teacherAutoApprove is required."));
         }
-        boolean enabled = settings.setStudentAutoApprove(Boolean.TRUE.equals(request.get("studentAutoApprove")));
-        return ResponseEntity.ok(Map.of("studentAutoApprove", enabled));
+        if (request.containsKey("studentAutoApprove")) settings.setStudentAutoApprove(Boolean.TRUE.equals(request.get("studentAutoApprove")));
+        if (request.containsKey("teacherAutoApprove")) settings.setTeacherAutoApprove(Boolean.TRUE.equals(request.get("teacherAutoApprove")));
+        return ResponseEntity.ok(get());
     }
 }

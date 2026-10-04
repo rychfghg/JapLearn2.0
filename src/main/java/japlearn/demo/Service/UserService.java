@@ -378,8 +378,8 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
                 user.setRole(ALLOWED_SELF_REGISTER_ROLES.contains(requestedRole) ? requestedRole : "student");
                 user.setId(null);
                 user.setEmail(email);
-                // Students are auto-approved only when the admin has switched that on; teachers always wait.
-                user.setApproved("student".equals(user.getRole()) && registrationSettings.isStudentAutoApprove());
+                // Students and teachers each have their own auto-approve switch (both off = manual approval).
+                user.setApproved(registrationSettings.autoApproveFor(user.getRole()));
                 user.setEmailConfirmed(false);
                 user.setResetToken(null);
                 user.setResetTokenExpiry(null);
