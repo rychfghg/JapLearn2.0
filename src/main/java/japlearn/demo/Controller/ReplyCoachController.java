@@ -60,15 +60,16 @@ public class ReplyCoachController {
     @PostMapping(value = "/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadMedia(@RequestPart("file") MultipartFile file) {
         try {
-            String contentType = file.getContentType() == null
-                    ? MediaType.APPLICATION_OCTET_STREAM_VALUE
-                    : file.getContentType();
-            if (!contentType.startsWith("audio/")) {
+            if (file.getSize() > 15_000_000) return ResponseEntity.status(413).body(Map.of("message", "Audio must be 15 MB or smaller."));
+            // Real type from the file's bytes (not the claimed type): audio only.
+            byte[] bytes = file.getBytes();
+            String contentType = japlearn.demo.Service.FileSafety.sniff(bytes);
+            if (contentType == null || !japlearn.demo.Service.FileSafety.AUDIO.contains(contentType)) {
                 return ResponseEntity.badRequest().body(Map.of("message", "Reply Coach BGM must be an audio file."));
             }
             Object id = gridFsTemplate.store(
-                    file.getInputStream(),
-                    file.getOriginalFilename(),
+                    new java.io.ByteArrayInputStream(bytes),
+                    japlearn.demo.Service.FileSafety.safeName(file.getOriginalFilename(), "bgm"),
                     contentType);
             return ResponseEntity.ok(Map.of(
                     "id", id.toString(),

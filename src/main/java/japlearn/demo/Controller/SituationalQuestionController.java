@@ -62,11 +62,14 @@ public class SituationalQuestionController {
     @PostMapping(value = "/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, String>> uploadMedia(@RequestPart("file") MultipartFile file)
             throws IOException {
-        String contentType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
-        if (!contentType.startsWith("image/") && !contentType.startsWith("audio/")) {
-            return ResponseEntity.badRequest().build();
-        }
-        Object id = gridFsTemplate.store(file.getInputStream(), file.getOriginalFilename(), contentType);
+        if (file.getSize() > 15_000_000) return ResponseEntity.status(413).build();
+        // Real type from the file's bytes (not the claimed type): only images and audio are stored.
+        byte[] bytes = file.getBytes();
+        java.util.Set<String> allowed = new java.util.HashSet<>(japlearn.demo.Service.FileSafety.IMAGES);
+        allowed.addAll(japlearn.demo.Service.FileSafety.AUDIO);
+        String contentType = japlearn.demo.Service.FileSafety.requireType(bytes, allowed, "media");
+        Object id = gridFsTemplate.store(new java.io.ByteArrayInputStream(bytes),
+                japlearn.demo.Service.FileSafety.safeName(file.getOriginalFilename(), "media"), contentType);
         return ResponseEntity.ok(Map.of(
                 "url", "/api/situational/media/" + id,
                 "contentType", contentType));

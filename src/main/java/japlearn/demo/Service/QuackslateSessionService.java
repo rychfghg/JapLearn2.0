@@ -126,6 +126,14 @@ public class QuackslateSessionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Add the scenario, Japanese sentence, answer and 2–12 word tiles");
         question.setId(null);
+        // Plain-text length limits for everything a teacher can type into a question.
+        FileSafety.limit(question.getPrompt(), 300, "Scenario");
+        FileSafety.limit(question.getTranslation(), 300, "Japanese sentence");
+        FileSafety.limit(question.getCorrectAnswer(), 300, "Answer");
+        if (question.getExplanation() != null) question.setExplanation(FileSafety.limit(question.getExplanation(), 600, "Explanation"));
+        if (question.getCategory() != null) FileSafety.limit(question.getCategory(), 60, "Category");
+        if (question.getDifficulty() != null) FileSafety.limit(question.getDifficulty(), 20, "Difficulty");
+        for (String tile : question.getOptions()) FileSafety.limit(tile, 40, "Word tile");
         question.setPrompt(question.getPrompt().trim());
         question.setTranslation(question.getTranslation().trim());
         question.setCorrectAnswer(question.getCorrectAnswer().trim());

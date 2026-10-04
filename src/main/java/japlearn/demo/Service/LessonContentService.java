@@ -60,7 +60,12 @@ public class LessonContentService {
 	
 	public String addFile(MultipartFile file) throws IOException {
 		
-		Object fileId = template.store(file.getInputStream(), file.getOriginalFilename(), file.getContentType());
+		// Only real images/audio (checked from the bytes) are stored, under their true type and a cleaned name.
+		byte[] bytes = file.getBytes();
+		java.util.Set<String> allowed = new java.util.HashSet<>(FileSafety.IMAGES);
+		allowed.addAll(FileSafety.AUDIO);
+		String type = FileSafety.requireType(bytes, allowed, "lesson media");
+		Object fileId = template.store(new java.io.ByteArrayInputStream(bytes), FileSafety.safeName(file.getOriginalFilename(), "media"), type);
 		
 		return fileId.toString();
 	}

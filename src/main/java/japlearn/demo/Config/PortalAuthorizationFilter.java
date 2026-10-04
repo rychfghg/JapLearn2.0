@@ -25,7 +25,7 @@ import japlearn.demo.Repository.UserRepository;
 public class PortalAuthorizationFilter extends OncePerRequestFilter {
     private static final ZoneId ZONE = ZoneId.of("Asia/Manila");
     private static final List<String> ADMIN_CONTENT_PREFIXES = List.of(
-        "/api/lessonPage", "/api/lessonContent",
+        "/api/lesson/", "/api/lessonPage", "/api/lessonContent",
         "/api/DatabankLesson", "/api/quackamolecontent", "/api/quackmancontent", "/api/quackslateContent",
         "/api/quackslate/question-bank", "/api/situational/questions", "/api/situational/media",
         "/api/reply-coach/chapters", "/api/reply-coach/media"

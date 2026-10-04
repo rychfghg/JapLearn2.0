@@ -98,27 +98,8 @@ public ResponseEntity<List<Student>> getAllStudents(@RequestParam(required = fal
     return ResponseEntity.ok(withoutPasswords(students));
 
 }
-    @PostMapping("/login")
-    public ResponseEntity<Object> login(@RequestBody Map<String, String> payload) {
-        String email = payload.get("email");
-        String password = payload.get("password");
-        if (loginAttempts.isBlocked(email)) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .header("Retry-After", "60")
-                    .body(Map.of("error", "Too many incorrect attempts for this account. Please try again in a minute."));
-        }
-        Student student = studentService.verifyCredentials(email, password);
-    
-        if (student != null) {
-            loginAttempts.clear(email);
-            student.setPassword(null);
-            return ResponseEntity.ok(student);
-        } else {
-            loginAttempts.recordFailure(email);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid email or password.");
-        }
-    }
-
+    // The old /api/students/login (checked passwords against stale student copies) was removed.
+    // All sign-ins go through /api/users/login.
     @DeleteMapping("/removeStudent")
     public ResponseEntity<String> removeStudent(@RequestBody Map<String, String> payload,
             @RequestHeader(value = "X-Teacher-Token", required = false) String sessionToken) {

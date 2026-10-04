@@ -30,7 +30,7 @@ public class ClassesService {
 
         Classes newClassEntity = new Classes();
         newClassEntity.setClassCodes(generateUniqueCode());
-        newClassEntity.setClassTitle(classTitle.trim());
+        newClassEntity.setClassTitle(FileSafety.limit(classTitle, 80, "Class name"));
         newClassEntity.setOwnerTeacherEmail(teacherEmail.trim().toLowerCase());
         classRepository.save(newClassEntity);
         return ResponseEntity.ok(newClassEntity);

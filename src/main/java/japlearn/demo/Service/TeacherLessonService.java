@@ -30,16 +30,32 @@ public class TeacherLessonService {
  public TeacherLessonService(LessonRepository l,LessonQuizAttemptRepository a,ClassesRepository c,StudentRepository s,GridFsTemplate f){lessons=l;attempts=a;classes=c;students=s;files=f;}
  private void ownClass(String email,String code){classes.findByClassCodesAndOwnerTeacherEmailIgnoreCase(code,email).orElseThrow(()->new ResponseStatusException(HttpStatus.FORBIDDEN,"This class belongs to another teacher"));}
  public Lesson create(String teacher,Lesson lesson,MultipartFile pdf){
-  validate(lesson); List<String> targets=lesson.getClassIds().stream().filter(code->code!=null&&!code.isBlank()).map(String::trim).distinct().toList();
+  validate(lesson); limitText(lesson); List<String> targets=lesson.getClassIds().stream().filter(code->code!=null&&!code.isBlank()).map(String::trim).distinct().toList();
   if(targets.isEmpty())targets=List.of(lesson.getClassId().trim()); for(String code:targets)ownClass(teacher,code);
   lesson.setClassIds(targets); lesson.setClassId(targets.get(0));
   lesson.setId(null); lesson.setOwnerTeacherEmail(teacher); lesson.setCreatedAt(Instant.now()); lesson.setPublished(true);
-  if(pdf==null||pdf.isEmpty())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"A PDF lesson file is required");String filename=pdf.getOriginalFilename()==null?"lesson.pdf":pdf.getOriginalFilename();if(!"application/pdf".equalsIgnoreCase(pdf.getContentType())&&!filename.toLowerCase(Locale.ROOT).endsWith(".pdf"))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Upload a PDF file");
-  if(pdf.getSize()>10_000_000)throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,"PDF must be 10 MB or smaller"); lesson.setSourceFileName(filename); lesson.setPdfPageCount(pageCount(pdf));
-  try{ObjectId fileId=files.store(pdf.getInputStream(),filename,"application/pdf");lesson.setPdfFileId(fileId.toHexString());return lessons.save(lesson);}catch(IOException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"The PDF could not be stored");}
+  if(pdf==null||pdf.isEmpty())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"A PDF lesson file is required");String filename=FileSafety.safeName(pdf.getOriginalFilename(),"lesson.pdf");if(!filename.toLowerCase(Locale.ROOT).endsWith(".pdf"))filename=filename+".pdf";
+  if(pdf.getSize()>10_000_000)throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,"PDF must be 10 MB or smaller");
+  // Must really be a PDF (checked from its bytes), and anything executable inside it is removed before storing.
+  byte[] cleanPdf;try{cleanPdf=FileSafety.sanitizePdf(pdf.getBytes());}catch(IOException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"The PDF could not be read");}
+  lesson.setSourceFileName(filename); lesson.setPdfPageCount(pageCount(cleanPdf));
+  try{ObjectId fileId=files.store(new java.io.ByteArrayInputStream(cleanPdf),filename,"application/pdf");lesson.setPdfFileId(fileId.toHexString());return lessons.save(lesson);}catch(org.springframework.dao.DataAccessException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"The PDF could not be stored");}
  }
- private int pageCount(MultipartFile file){try(PDDocument doc=Loader.loadPDF(file.getBytes())){if(doc.getNumberOfPages()<1)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"The PDF has no pages");return doc.getNumberOfPages();}catch(IOException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"The PDF could not be read");}}
+ private int pageCount(byte[] bytes){try(PDDocument doc=Loader.loadPDF(bytes)){if(doc.getNumberOfPages()<1)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"The PDF has no pages");return doc.getNumberOfPages();}catch(IOException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"The PDF could not be read");}}
  private void validate(Lesson l){if(l==null||blank(l.getClassId())||blank(l.getLesson_title())||blank(l.getLesson_type()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Class, title and lesson type are required"); if(l.getQuizTimerSeconds()!=null&&(l.getQuizTimerSeconds()<15||l.getQuizTimerSeconds()>7200))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Quiz timer must be between 15 seconds and 2 hours"); for(Lesson.QuizQuestion q:l.getQuiz()){q.setType(q.getType()==null?"MULTIPLE_CHOICE":q.getType().toUpperCase()); if(blank(q.getPrompt())||blank(q.getCorrectAnswer()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Every quiz question needs a prompt and correct answer"); if("TRUE_FALSE".equals(q.getType()))q.setChoices(List.of("True","False")); if("MULTIPLE_CHOICE".equals(q.getType())&&(q.getChoices().size()<2||!q.getChoices().contains(q.getCorrectAnswer())))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Multiple-choice answers must match one of the choices");}}
+ // Caps the size of every text field and list a teacher can submit (plain text only; the apps display it as text, never as HTML).
+ private void limitText(Lesson l){
+  l.setLesson_title(FileSafety.limit(l.getLesson_title(),120,"Lesson title")); l.setLesson_type(FileSafety.limit(l.getLesson_type(),40,"Lesson type"));
+  if(l.getLesson_description()!=null)l.setLesson_description(FileSafety.limit(l.getLesson_description(),1000,"Description"));
+  if(l.getClassIds().size()>30)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Too many classes selected");
+  if(l.getSections().size()>40)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Too many sections (max 40)");
+  for(Lesson.LessonSection s:l.getSections()){s.setHeading(FileSafety.limit(s.getHeading(),150,"Section heading"));s.setBody(FileSafety.limit(s.getBody(),5000,"Section text"));}
+  if(l.getQuiz().size()>50)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Too many quiz questions (max 50)");
+  for(Lesson.QuizQuestion q:l.getQuiz()){q.setPrompt(FileSafety.limit(q.getPrompt(),500,"Question"));q.setCorrectAnswer(FileSafety.limit(q.getCorrectAnswer(),200,"Answer"));
+   if(q.getExplanation()!=null)q.setExplanation(FileSafety.limit(q.getExplanation(),800,"Explanation"));
+   if(q.getChoices().size()>8)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Too many answer choices (max 8)");
+   List<String> choices=new ArrayList<>();for(String c:q.getChoices())choices.add(FileSafety.limit(c,200,"Answer choice"));q.setChoices(choices);}
+ }
  public List<Lesson> teacherList(String teacher){return lessons.findByOwnerTeacherEmailIgnoreCaseOrderByCreatedAtDesc(teacher);}
  public Lesson owned(String teacher,String id){Lesson l=lessons.findById(id).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Lesson not found")); if(!teacher.equalsIgnoreCase(l.getOwnerTeacherEmail()))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"This lesson belongs to another teacher");return l;}
  public void delete(String teacher,String id){Lesson lesson=owned(teacher,id);attempts.deleteAll(attempts.findByLessonIdOrderBySubmittedAtDesc(id));if(lesson.getPdfFileId()!=null&&ObjectId.isValid(lesson.getPdfFileId()))files.delete(Query.query(Criteria.where("_id").is(new ObjectId(lesson.getPdfFileId()))));lessons.deleteById(id);}
