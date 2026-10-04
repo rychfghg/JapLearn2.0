@@ -282,7 +282,8 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             user.setLname(String.valueOf(values.get("lname")).trim());
             user.setEmail(email);
             String role = String.valueOf(values.get("role")).trim().toLowerCase();
-            if (!Set.of("student", "teacher", "admin").contains(role)) {
+            // Admin accounts can never be created through the API (only directly in the database).
+            if (!Set.of("student", "teacher").contains(role)) {
                 throw new IllegalArgumentException("Invalid account role");
             }
             String password = String.valueOf(values.get("password"));
@@ -298,10 +299,19 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
         public User updateUser(String userId, Map<String, Object> updates) {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            // Admin accounts are managed only directly in the database, never through the API.
+            if ("admin".equalsIgnoreCase(user.getRole())) {
+                throw new IllegalArgumentException("Admin accounts cannot be changed here");
+            }
             if (updates.containsKey("fname")) user.setFname(String.valueOf(updates.get("fname")).trim());
             if (updates.containsKey("lname")) user.setLname(String.valueOf(updates.get("lname")).trim());
             if (updates.containsKey("email")) user.setEmail(String.valueOf(updates.get("email")).trim().toLowerCase());
-            if (updates.containsKey("role")) user.setRole(String.valueOf(updates.get("role")).trim().toLowerCase());
+            if (updates.containsKey("role")) {
+                // Only student <-> teacher; nobody can be promoted to admin (or any other role) via the API.
+                String role = String.valueOf(updates.get("role")).trim().toLowerCase();
+                if (!Set.of("student", "teacher").contains(role)) throw new IllegalArgumentException("Invalid account role");
+                user.setRole(role);
+            }
             if (updates.containsKey("approved")) user.setApproved(Boolean.TRUE.equals(updates.get("approved")));
             if (updates.containsKey("emailConfirmed")) user.setEmailConfirmed(Boolean.TRUE.equals(updates.get("emailConfirmed")));
             if (updates.containsKey("guidedPhraseEnabled")) user.setGuidedPhraseEnabled(Boolean.TRUE.equals(updates.get("guidedPhraseEnabled")));
@@ -329,6 +339,9 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
         public void deleteUser(String userId) {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            if ("admin".equalsIgnoreCase(user.getRole())) {
+                throw new IllegalArgumentException("Admin accounts cannot be deleted here");
+            }
             Student student = studentRepository.findByEmail(user.getEmail());
             if (student != null) studentRepository.delete(student);
             userRepository.delete(user);
