@@ -116,7 +116,7 @@ public class WebAccountDeletionService {
         MimeMessage message = mailSender.createMimeMessage();
         try {
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
-            helper.setTo(email);
+            helper.setTo(EmailInput.recipient(email)); // exactly one clean address, never a list
             helper.setFrom("JapLearn <" + mailFromAddress + ">");
             helper.setSubject("Confirm account deletion - JapLearn");
             helper.setText(
@@ -145,7 +145,7 @@ public class WebAccountDeletionService {
         MimeMessage message = mailSender.createMimeMessage();
         try {
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
-            helper.setTo(supportEmail);
+            helper.setTo(EmailInput.recipient(supportEmail));
             helper.setFrom("JapLearn <" + mailFromAddress + ">");
             helper.setSubject("Account deletion review - " + user.getEmail());
             helper.setText(

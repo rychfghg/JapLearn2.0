@@ -118,13 +118,21 @@ public class UserController {
 
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request, jakarta.servlet.http.HttpServletRequest httpRequest) {
         try {
+            // Strict single-address check first: anything else (lists, line breaks, code) gets the generic reply and nothing is sent.
+            String email = japlearn.demo.Service.EmailInput.normalize(request == null ? null : request.get("email"));
+            if (email == null) return ResponseEntity.ok(Collections.singletonMap("message", "If the account exists, a password reset email has been sent."));
+            // Admin accounts: never send a reset link; alert the owner instead. Same generic reply.
+            if (isAdminAccount(email)) {
+                adminAlerts.alert(japlearn.demo.Service.AdminAlertService.Event.RESET_ATTEMPT, httpRequest, "/admin/login");
+                return ResponseEntity.ok(Collections.singletonMap("message", "If the account exists, a password reset email has been sent."));
+            }
             // Cooldown per address; the reply is the same either way.
-            if (emailActions.allow("reset", request.get("email"))) japlearnService.sendForgotPasswordEmail(request.get("email"));
+            if (emailActions.allow("reset", email)) japlearnService.sendForgotPasswordEmail(email);
             return ResponseEntity.ok(Collections.singletonMap("message", "If the account exists, a password reset email has been sent."));
-        } catch (UsernameNotFoundException ex) {
-            // Do not reveal which email addresses are registered.
+        } catch (RuntimeException ex) {
+            // Unknown address, blocked address or a send failure: never reveal which, always the same reply.
             return ResponseEntity.ok(Collections.singletonMap("message", "If the account exists, a password reset email has been sent."));
         }
     }
@@ -225,6 +233,11 @@ public ResponseEntity<?> resetPassword(@RequestParam("token") String token, @Req
 public ResponseEntity<?> registerUser(@RequestBody User user) {
     try {
         // Block throw-away inboxes, fake domains and sign-up floods before anything is saved or emailed.
+        String cleanEmail = japlearn.demo.Service.EmailInput.normalize(user == null ? null : user.getEmail());
+        if (cleanEmail == null) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Please use a valid Gmail address."));
+        }
+        user.setEmail(cleanEmail);
         japlearn.demo.Service.RegistrationGuard.Verdict verdict = registrationGuard.check(user == null ? null : user.getEmail(), user == null ? null : user.getRole());
         if (verdict == japlearn.demo.Service.RegistrationGuard.Verdict.NOT_ALLOWED) {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Please use a valid Gmail address."));
@@ -288,7 +301,9 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
 
     @PostMapping("/login")
 public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest, jakarta.servlet.http.HttpServletRequest httpRequest) {
-    String email = loginRequest.getEmail();
+    // Strict single-address check; anything that is not one plain email is a failed sign-in.
+    String email = japlearn.demo.Service.EmailInput.normalize(loginRequest == null ? null : loginRequest.getEmail());
+    if (email == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "Invalid credentials"));
     boolean adminAccount = isAdminAccount(email);
     if (loginAttempts.isBlocked(email)) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

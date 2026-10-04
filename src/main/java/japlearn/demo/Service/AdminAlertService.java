@@ -56,7 +56,8 @@ public class AdminAlertService {
     public enum Event {
         PAGE_OPENED("Admin page opened", "Someone opened the JapLearn admin area."),
         FAILED_SIGN_IN("Failed admin sign-in", "Someone tried to sign in to an admin account and failed."),
-        SIGNED_IN("Admin signed in", "Someone signed in to a JapLearn admin account successfully.");
+        SIGNED_IN("Admin signed in", "Someone signed in to a JapLearn admin account successfully."),
+        RESET_ATTEMPT("Admin password reset attempted", "Someone requested a password reset for an admin account. It was blocked: admin passwords cannot be reset by email.");
 
         final String title, summary;
         Event(String title, String summary) { this.title = title; this.summary = summary; }
@@ -89,10 +90,10 @@ public class AdminAlertService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setTo(alertEmail);
+            helper.setTo(EmailInput.recipient(alertEmail));
             helper.setFrom("JapLearn Security <" + mailFromAddress + ">");
             helper.setSubject("[JapLearn security] " + event.title);
-            String color = event == Event.SIGNED_IN ? "#2f7a1c" : event == Event.FAILED_SIGN_IN ? "#c0392b" : "#8423d9";
+            String color = event == Event.SIGNED_IN ? "#2f7a1c" : (event == Event.FAILED_SIGN_IN || event == Event.RESET_ATTEMPT) ? "#c0392b" : "#8423d9";
             helper.setText("<div style=\"font-family:Arial,sans-serif;color:#2f1a3a;max-width:520px\">"
                     + "<h2 style=\"font-size:18px;color:" + color + ";margin:0 0 8px\">" + event.title + "</h2>"
                     + "<p style=\"margin:0 0 14px\">" + event.summary + "</p>"

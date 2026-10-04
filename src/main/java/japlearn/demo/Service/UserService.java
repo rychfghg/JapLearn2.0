@@ -66,9 +66,16 @@ public class UserService {
 
     // Method to handle forgot password
     public String sendForgotPasswordEmail(String email) {
+        email = EmailInput.normalize(email);
+        if (email == null) throw new UsernameNotFoundException("User not found");
         User user = userRepository.findByEmail(email);
         if (user == null) {
             throw new UsernameNotFoundException("User not found");
+        }
+        // Admin passwords are never reset by email. They are changed only in the database,
+        // so knowing (or guessing) an admin email gives an attacker nothing to work with.
+        if ("admin".equalsIgnoreCase(user.getRole())) {
+            return "admin";
         }
 
         // Generate reset token. It used to never expire — resetTokenExpiry
@@ -97,7 +104,7 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
     MimeMessage mimeMessage = mailSender.createMimeMessage();
     try {
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
-        helper.setTo(email);
+        helper.setTo(EmailInput.recipient(email)); // exactly one clean address, never a list
         // Previous sender fallback:
         // helper.setFrom("JapLearn <bacolod2186@gmail.com>");
         helper.setFrom("JapLearn <" + mailFromAddress + ">");
@@ -130,6 +137,13 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
 
     User user = userRepository.findByResetToken(token);
     if (user == null) {
+        return "invalid";
+    }
+    // Even an old leftover reset link can never change an admin password.
+    if ("admin".equalsIgnoreCase(user.getRole())) {
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
         return "invalid";
     }
 
@@ -275,7 +289,8 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
         }
 
         public User createManagedUser(Map<String, Object> values) {
-            String email = String.valueOf(values.get("email")).trim().toLowerCase();
+            String email = EmailInput.normalize(values.get("email"));
+            if (email == null) throw new IllegalArgumentException("Invalid email address");
             if (userRepository.findByEmail(email) != null) throw new IllegalArgumentException("Email already exists");
             User user = new User();
             user.setFname(String.valueOf(values.get("fname")).trim());
@@ -305,7 +320,11 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             }
             if (updates.containsKey("fname")) user.setFname(String.valueOf(updates.get("fname")).trim());
             if (updates.containsKey("lname")) user.setLname(String.valueOf(updates.get("lname")).trim());
-            if (updates.containsKey("email")) user.setEmail(String.valueOf(updates.get("email")).trim().toLowerCase());
+            if (updates.containsKey("email")) {
+                String email = EmailInput.normalize(updates.get("email"));
+                if (email == null) throw new IllegalArgumentException("Invalid email address");
+                user.setEmail(email);
+            }
             if (updates.containsKey("role")) {
                 // Only student <-> teacher; nobody can be promoted to admin (or any other role) via the API.
                 String role = String.valueOf(updates.get("role")).trim().toLowerCase();
@@ -423,7 +442,7 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             try {
                 MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
-                helper.setTo(email);
+                helper.setTo(EmailInput.recipient(email)); // exactly one clean address, never a list
                 // Previous sender fallback:
                 // helper.setFrom("JapLearn <bacolod2186@gmail.com>");
                 helper.setFrom("JapLearn <" + mailFromAddress + ">");
@@ -489,6 +508,10 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
     
 
     public User authenticate(String email, String rawPassword) {
+        email = EmailInput.normalize(email);
+        if (email == null || rawPassword == null || rawPassword.length() > 256) {
+            throw new BadCredentialsException("Invalid credentials");
+        }
         User user = userRepository.findByEmail(email);
         if (user == null) {
             throw new UsernameNotFoundException("User not found");
