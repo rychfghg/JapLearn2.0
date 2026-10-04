@@ -70,9 +70,9 @@ public class StudentController {
     public ResponseEntity<List<Student>> getStudentsByClassCode(@RequestParam String classCode,
             @RequestParam(required = false) String teacherEmail,
             @RequestHeader(value = "X-Teacher-Token", required = false) String sessionToken) {
-        List<Student> students = teacherEmail == null
-                ? studentService.getStudentsByClassCode(classCode)
-                : studentService.getStudentsByClassCodeForTeacher(teacherAuthorization.requireTeacher(teacherEmail, sessionToken), classCode);
+        // Only the class owner may list its students (names + emails). No anonymous path.
+        if (teacherEmail == null || teacherEmail.isBlank()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        List<Student> students = studentService.getStudentsByClassCodeForTeacher(teacherAuthorization.requireTeacher(teacherEmail, sessionToken), classCode);
         return ResponseEntity.ok(withoutPasswords(students));
     }
     
@@ -82,23 +82,19 @@ public class StudentController {
     // }
 @GetMapping("/getStudentByEmail")
 public ResponseEntity<?> getStudentByEmail(@RequestParam String email) {
+    // The app only needs the class code. Return just that, and the same shape for
+    // unknown addresses, so this route cannot reveal names or confirm who has an account.
     Student student = studentService.getStudentByEmail(email);
-
-    if (student == null) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Student not found"));
-    }
-
-    student.setPassword(null);
-    return ResponseEntity.ok(student);
-
-    
+    String classCode = student == null || student.getClassCode() == null ? "" : student.getClassCode();
+    return ResponseEntity.ok(Map.of("classCode", classCode));
 }
 @GetMapping("/getAllStudents")
 public ResponseEntity<List<Student>> getAllStudents(@RequestParam(required = false) String teacherEmail,
         @RequestHeader(value = "X-Teacher-Token", required = false) String sessionToken) {
-    List<Student> students = teacherEmail == null
-            ? studentService.getAllStudents()
-            : studentService.getStudentsForTeacher(teacherAuthorization.requireTeacher(teacherEmail, sessionToken));
+    // This used to return EVERY student (names + emails) to anyone who left out teacherEmail.
+    // Now a teacher only ever sees the students in their own classes.
+    if (teacherEmail == null || teacherEmail.isBlank()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    List<Student> students = studentService.getStudentsForTeacher(teacherAuthorization.requireTeacher(teacherEmail, sessionToken));
     return ResponseEntity.ok(withoutPasswords(students));
 
 }

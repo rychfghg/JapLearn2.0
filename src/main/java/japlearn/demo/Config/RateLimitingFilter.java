@@ -50,12 +50,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         Map.entry("/api/users/login", new int[]{100, 60}),
         Map.entry("/api/students/login", new int[]{100, 60}),
         // A classroom may register ~40 learners behind one public IP.
-        Map.entry("/api/users/register", new int[]{60, 60}),
-        Map.entry("/api/users/register-teacher", new int[]{6, 60}),
-        Map.entry("/api/users/forgot-password", new int[]{5, 60}),
+        // Tightened after a sign-up flood: a classroom can still register over a few
+        // minutes, but one IP can no longer mass-create accounts. RegistrationGuard
+        // adds a global hourly cap and blocks throw-away email services.
+        Map.entry("/api/users/register", new int[]{20, 600}),
+        Map.entry("/api/users/register-teacher", new int[]{3, 3600}),
+        // Each address also has its own cooldown (EmailActionLimiter).
+        Map.entry("/api/users/forgot-password", new int[]{10, 600}),
         Map.entry("/api/users/reset-password", new int[]{10, 60}),
         Map.entry("/api/users/delete-account", new int[]{5, 60}),
-        Map.entry("/api/users/request-account-deletion", new int[]{5, 60}),
+        Map.entry("/api/users/request-account-deletion", new int[]{5, 600}),
         Map.entry("/api/users/confirm-account-deletion", new int[]{10, 60}),
         Map.entry("/api/users/account-deletion-request", new int[]{20, 60}),
         Map.entry("/api/dialogue-relay/bonus/assess", new int[]{10, 60}),
@@ -73,6 +77,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private static final int[] DEFAULT_LIMIT = {6000, 60};
 
     private static final int MAX_TRACKED_KEYS = 20_000;
+    private static final long MAX_JSON_BYTES = 2L * 1024 * 1024;
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
@@ -90,6 +95,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         if (HttpMethod.OPTIONS.matches(request.getMethod()) || path == null || !path.startsWith("/api/")) {
             filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Reject oversized JSON/text bodies early (file uploads keep their own multipart limits).
+        String contentType = request.getContentType();
+        boolean multipart = contentType != null && contentType.toLowerCase().startsWith("multipart/");
+        if (!multipart && request.getContentLengthLong() > MAX_JSON_BYTES) {
+            response.setStatus(413);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Request too large.\"}");
             return;
         }
 

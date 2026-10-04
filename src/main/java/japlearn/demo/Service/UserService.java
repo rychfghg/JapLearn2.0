@@ -334,6 +334,14 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             userRepository.delete(user);
         }
 
+        // Trims a name and rejects it if empty, longer than 60 characters, or containing markup/control characters.
+        private static String cleanName(String value) {
+            if (value == null) return null;
+            String v = value.trim().replaceAll("\\s+", " ");
+            if (v.isEmpty() || v.length() > 60 || v.matches(".*[<>{}\\[\\]\\\\$`\\p{Cntrl}].*")) return null;
+            return v;
+        }
+
         public String registerUser(User user) {
             try {
                 if (user == null || user.getEmail() == null || user.getPassword() == null) {
@@ -344,9 +352,16 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
                 if (email.isBlank() || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
                     return "invalid";
                 }
-                if (user.getPassword().length() < 8) {
+                if (user.getPassword().length() < 8 || user.getPassword().length() > 128 || email.length() > 254) {
                     return "invalid";
                 }
+                // Names: required, short, and plain text only (no tags / control characters).
+                String fname = cleanName(user.getFname()), lname = cleanName(user.getLname());
+                if (fname == null || lname == null) {
+                    return "invalid";
+                }
+                user.setFname(fname);
+                user.setLname(lname);
 
                 if (userRepository.findByEmail(email) != null) {
                     return "duplicate";
@@ -476,7 +491,9 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
         if (!"admin".equalsIgnoreCase(user.getRole()) && !user.isEmailConfirmed()) {
             throw new IllegalStateException("Email not confirmed");
         }
-        if ("student".equalsIgnoreCase(user.getRole())) {
+        // Students and teachers both need JapLearn admin approval. Teachers can manage
+        // classes and see their students, so a self-registered teacher must be vetted first.
+        if ("student".equalsIgnoreCase(user.getRole()) || "teacher".equalsIgnoreCase(user.getRole())) {
             if (!user.isApproved()) {
                 throw new IllegalStateException("User not approved");
             }

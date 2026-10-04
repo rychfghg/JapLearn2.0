@@ -147,7 +147,6 @@ public class WebAccountDeletionService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
             helper.setTo(supportEmail);
             helper.setFrom("JapLearn <" + mailFromAddress + ">");
-            helper.setReplyTo(user.getEmail());
             helper.setSubject("Account deletion review - " + user.getEmail());
             helper.setText(
                     "<div style=\"font-family:Arial,sans-serif;color:#2f1a3a\">"

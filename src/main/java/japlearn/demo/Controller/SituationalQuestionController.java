@@ -139,9 +139,9 @@ public class SituationalQuestionController {
     public List<SituationalAttempt> getAttempts(
             @RequestParam(required = false) String email,
             @RequestParam(required = false) String gameType) {
-        List<SituationalAttempt> result = email == null || email.isBlank()
-                ? attempts.findAll()
-                : attempts.findByEmailIgnoreCaseOrderByCompletedAtDesc(email);
+        // Never list every learner's attempts (that exposed all student emails).
+        if (email == null || email.isBlank()) return List.of();
+        List<SituationalAttempt> result = attempts.findByEmailIgnoreCaseOrderByCompletedAtDesc(email);
         return (gameType == null || gameType.isBlank() ? result : result.stream()
                 .filter(item -> gameType.equalsIgnoreCase(item.getGameType())).toList()).stream()
                 .map(this::normalizeRecognitionScore)

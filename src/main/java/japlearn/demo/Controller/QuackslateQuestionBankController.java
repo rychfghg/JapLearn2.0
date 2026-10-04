@@ -26,7 +26,12 @@ public class QuackslateQuestionBankController {
     }
 
     @GetMapping
-    public List<QuackslateQuestion> getAll() { return repository.findAll(); }
+    public List<QuackslateQuestion> getAll() {
+        // Public list: hide teacher email addresses stored as the question author.
+        List<QuackslateQuestion> all = repository.findAll();
+        all.forEach((q) -> { if (q.getCreatedBy() != null && q.getCreatedBy().contains("@")) q.setCreatedBy("TEACHER"); });
+        return all;
+    }
 
     @GetMapping("/system")
     public List<QuackslateQuestion> getSystemQuestions(@RequestParam(defaultValue = "10") int limit) {

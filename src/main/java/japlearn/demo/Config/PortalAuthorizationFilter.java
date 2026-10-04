@@ -24,6 +24,12 @@ import japlearn.demo.Repository.UserRepository;
 @Order(2)
 public class PortalAuthorizationFilter extends OncePerRequestFilter {
     private static final ZoneId ZONE = ZoneId.of("Asia/Manila");
+    private static final List<String> ADMIN_CONTENT_PREFIXES = List.of(
+        "/api/lessonPage", "/api/lessonContent",
+        "/api/DatabankLesson", "/api/quackamolecontent", "/api/quackmancontent", "/api/quackslateContent",
+        "/api/quackslate/question-bank", "/api/situational/questions", "/api/situational/media",
+        "/api/reply-coach/chapters", "/api/reply-coach/media"
+    );
     private static final List<String> MANAGED_CONTENT_PREFIXES = List.of(
         "/api/lesson", "/api/lessonPage", "/api/lessonContent",
         "/api/DatabankLesson", "/api/DatabankLessonPage", "/api/DatabankLessonContent",
@@ -85,6 +91,12 @@ public class PortalAuthorizationFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/users/admin-create")) return true;
         if (path.matches("/api/users/[^/]+(/guided-phrase-access)?")
                 && !HttpMethod.GET.matches(method)) return true;
+        // Whole-school data lists (every student's progress / scores with emails): admin only.
+        if (HttpMethod.GET.matches(method) && (path.equals("/api/progress") || path.equals("/api/scores/export")
+                || path.equals("/api/scores/getAvailableDates"))) return true;
+        // Global game content shared by every learner: only admins may change it.
+        // (Teachers keep /api/lesson/* for their own class lessons.)
+        if (!HttpMethod.GET.matches(method) && !HttpMethod.OPTIONS.matches(method) && ADMIN_CONTENT_PREFIXES.stream().anyMatch(path::startsWith)) return true;
         // Destructive score/progress deletes: nothing in the app or portal calls these, so admin only.
         if (HttpMethod.DELETE.matches(method) && (path.equals("/api/scores/delete")
                 || path.equals("/api/scores/deleteByDate") || path.startsWith("/api/progress/"))) return true;

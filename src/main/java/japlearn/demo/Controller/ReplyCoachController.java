@@ -272,9 +272,9 @@ public class ReplyCoachController {
     public List<ReplyCoachAttempt> attemptHistory(
             @RequestParam(required = false) String email,
             @RequestParam(required = false) String status) {
-        List<ReplyCoachAttempt> result = email == null || email.isBlank()
-                ? attempts.findAll()
-                : attempts.findByEmailIgnoreCaseOrderByUpdatedAtDesc(email);
+        // Never list every learner's attempts (that exposed all student emails).
+        if (email == null || email.isBlank()) return List.of();
+        List<ReplyCoachAttempt> result = attempts.findByEmailIgnoreCaseOrderByUpdatedAtDesc(email);
         if (status == null || status.isBlank()) return result;
         return result.stream()
                 .filter(item -> status.equalsIgnoreCase(item.getStatus()))

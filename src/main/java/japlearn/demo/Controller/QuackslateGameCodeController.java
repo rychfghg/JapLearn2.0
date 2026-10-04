@@ -59,8 +59,11 @@ public class QuackslateGameCodeController {
     public ResponseEntity<?> validateGameCode(@PathVariable String gameCode) {
         Optional<QuackslateGameCode> game = quackslateGameService.findByGameCode(gameCode);
         if (game.isPresent()) {
-            // If game code is valid, return the game data
-            return ResponseEntity.ok(game.get());
+            // Return the game, but never the teacher's email or the joined students' emails.
+            QuackslateGameCode safe = game.get();
+            safe.setOwnerTeacherEmail(null);
+            safe.setJoinedStudentEmails(null);
+            return ResponseEntity.ok(safe);
         } else {
             // Return 404 if the game code is invalid
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Invalid Game Code");

@@ -42,6 +42,10 @@ public class UserController {
     private final AccountDeletionService accountDeletion;
     private final WebAccountDeletionService webAccountDeletion;
     private final LoginAttemptLimiter loginAttempts;
+    @Autowired
+    private japlearn.demo.Service.EmailActionLimiter emailActions;
+    @Autowired
+    private japlearn.demo.Service.RegistrationGuard registrationGuard;
 
     @Autowired
     public UserController(UserService japlearnService,
@@ -56,44 +60,26 @@ public class UserController {
         this.loginAttempts = loginAttempts;
     }
 
-    /**
-     * Step 1 of the public web deletion page: emails the owner a confirmation
-     * link, or refers teacher accounts to the JapLearn team for review.
-     */
+    // Public web deletion is closed: requests are handled by email to the JapLearn team
+    // (or in the signed-in app via /delete-account). These routes take no input and give
+    // the same answer to everyone, so they cannot reveal anything about any account.
+    private static final Map<String, String> DELETION_BY_EMAIL = Map.of(
+            "status", "closed",
+            "message", "Account deletion is handled by email. Write to japlearnofficial@gmail.com from your account's email address.");
+
     @PostMapping("/request-account-deletion")
-    public ResponseEntity<?> requestAccountDeletion(@RequestBody Map<String, String> request) {
-        WebAccountDeletionService.Outcome outcome = webAccountDeletion.requestDeletion(request.get("email"));
-        // Never reveal whether an address is registered.
-        return ResponseEntity.ok(Map.of(
-                "status", outcome == WebAccountDeletionService.Outcome.MANUAL_REVIEW ? "review" : "sent",
-                "message", outcome == WebAccountDeletionService.Outcome.MANUAL_REVIEW
-                        ? "This account needs a quick review by the JapLearn team. We will contact you by email."
-                        : "If that account exists, we have emailed a confirmation link that expires in 30 minutes."));
+    public ResponseEntity<?> requestAccountDeletion() {
+        return ResponseEntity.status(HttpStatus.GONE).body(DELETION_BY_EMAIL);
     }
 
-    /** Lets the confirmation page show which account the link belongs to. */
     @GetMapping("/account-deletion-request")
-    public ResponseEntity<?> accountDeletionRequest(@RequestParam("token") String token) {
-        User user = webAccountDeletion.findByDeletionToken(token);
-        if (user == null) {
-            return ResponseEntity.status(HttpStatus.GONE)
-                    .body(Collections.singletonMap("message", "This link is invalid, already used, or expired."));
-        }
-        return ResponseEntity.ok(Map.of("email", user.getEmail(), "name",
-                String.valueOf(user.getFname() == null ? "" : user.getFname())));
+    public ResponseEntity<?> accountDeletionRequest() {
+        return ResponseEntity.status(HttpStatus.GONE).body(DELETION_BY_EMAIL);
     }
 
-    /** Step 2: the emailed link was opened and DELETE was typed. */
     @PostMapping("/confirm-account-deletion")
-    public ResponseEntity<?> confirmAccountDeletion(@RequestParam("token") String token,
-            @RequestBody Map<String, String> request) {
-        boolean deleted = webAccountDeletion.confirmDeletion(token, request.get("confirmation"));
-        if (!deleted) {
-            return ResponseEntity.status(HttpStatus.GONE).body(Collections.singletonMap("message",
-                    "This link is invalid, already used, or expired. Request a new one to continue."));
-        }
-        return ResponseEntity.ok(Collections.singletonMap("message",
-                "Your JapLearn account and learning records have been permanently deleted."));
+    public ResponseEntity<?> confirmAccountDeletion() {
+        return ResponseEntity.status(HttpStatus.GONE).body(DELETION_BY_EMAIL);
     }
 
     /**
@@ -123,7 +109,8 @@ public class UserController {
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
         try {
-            japlearnService.sendForgotPasswordEmail(request.get("email"));
+            // Cooldown per address; the reply is the same either way.
+            if (emailActions.allow("reset", request.get("email"))) japlearnService.sendForgotPasswordEmail(request.get("email"));
             return ResponseEntity.ok(Collections.singletonMap("message", "If the account exists, a password reset email has been sent."));
         } catch (UsernameNotFoundException ex) {
             // Do not reveal which email addresses are registered.
@@ -226,11 +213,25 @@ public ResponseEntity<?> resetPassword(@RequestParam("token") String token, @Req
     @PostMapping("/register")
 public ResponseEntity<?> registerUser(@RequestBody User user) {
     try {
+        // Block throw-away inboxes, fake domains and sign-up floods before anything is saved or emailed.
+        japlearn.demo.Service.RegistrationGuard.Verdict verdict = registrationGuard.check(user == null ? null : user.getEmail(), user == null ? null : user.getRole());
+        if (verdict == japlearn.demo.Service.RegistrationGuard.Verdict.NOT_ALLOWED) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", "Email must be a valid Gmail or CIT email."));
+        }
+        if (verdict == japlearn.demo.Service.RegistrationGuard.Verdict.DISPOSABLE || verdict == japlearn.demo.Service.RegistrationGuard.Verdict.BAD_DOMAIN) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error",
+                    "Please use a real email address you can access (for example Gmail, Outlook, Yahoo, or your school email)."));
+        }
+        if (verdict == japlearn.demo.Service.RegistrationGuard.Verdict.BUSY) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).header("Retry-After", "900").body(Collections.singletonMap("error",
+                    "Sign-ups are very busy right now. Please try again in a few minutes."));
+        }
         String result = japlearnService.registerUser(user);
-        if ("success".equals(result)) {
+        // Same answer for a new or an already-registered email, so sign-up cannot be used
+        // to check who has an account. (No email is sent for an existing address; the
+        // owner can use "Forgot password" if needed.)
+        if ("success".equals(result) || "duplicate".equals(result)) {
             return ResponseEntity.status(HttpStatus.CREATED).body(Collections.singletonMap("message", "Registration successful"));
-        } else if ("duplicate".equals(result)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Collections.singletonMap("error", "User already exists"));
         } else {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "Registration failed"));
         }

@@ -31,7 +31,10 @@ public class LessonController {
 	
 	@GetMapping("/getLessonByClass/{classId}")
 	public List<Lesson> getLessonsByClass(@PathVariable String classId){
-		return lessonservice.getLessonsByClass(classId);
+		// Students load this by class code; never include the teacher's email in the public response.
+		List<Lesson> lessons = lessonservice.getLessonsByClass(classId);
+		lessons.forEach((lesson) -> lesson.setOwnerTeacherEmail(null));
+		return lessons;
 	}
 	
 	@DeleteMapping("/deleteLesson")
