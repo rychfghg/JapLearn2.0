@@ -50,9 +50,14 @@ public class StudentAuthorizationService {
      * and a matching-but-expired token is renewed instead of rejected.
      */
     public void requireOwnStudent(String email, String token) {
+        requireOwnStudent(email, token, false);
+    }
+
+    /** tokenMandatory = true: reading a student's data always needs that student's token (never just an email). */
+    public void requireOwnStudent(String email, String token, boolean tokenMandatory) {
         boolean hasToken = token != null && !token.isBlank();
         if (!hasToken) {
-            if (tokenRequired) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Student sign-in is required");
+            if (tokenRequired || tokenMandatory) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Student sign-in is required");
             return;
         }
         if (email == null || email.isBlank())

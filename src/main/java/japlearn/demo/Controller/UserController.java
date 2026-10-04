@@ -305,10 +305,12 @@ public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest, jakar
     String email = japlearn.demo.Service.EmailInput.normalize(loginRequest == null ? null : loginRequest.getEmail());
     if (email == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "Invalid credentials"));
     boolean adminAccount = isAdminAccount(email);
-    if (loginAttempts.isBlocked(email)) {
+    // Admin accounts lock for 30 minutes after 5 wrong passwords; others for a minute after 6.
+    // Same wording either way, so the reply never reveals that an email is an admin account.
+    if (loginAttempts.isBlocked(email) || (adminAccount && loginAttempts.isAdminLocked(email))) {
+        if (adminAccount) adminAlerts.alert(japlearn.demo.Service.AdminAlertService.Event.FAILED_SIGN_IN, httpRequest, "/admin/login");
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", "60")
-                .body(Collections.singletonMap("error", "Too many incorrect attempts for this account. Please try again in a minute."));
+                .body(Collections.singletonMap("error", "Too many incorrect attempts for this account. Please try again later."));
     }
     try {
         User authenticatedUser = japlearnService.authenticate(email, loginRequest.getPassword());
@@ -326,6 +328,7 @@ public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest, jakar
         return ResponseEntity.ok(response);
     } catch (UsernameNotFoundException | BadCredentialsException ex) {
         loginAttempts.recordFailure(email);
+        if (adminAccount) loginAttempts.recordAdminFailure(email);
         if (adminAccount) adminAlerts.alert(japlearn.demo.Service.AdminAlertService.Event.FAILED_SIGN_IN, httpRequest, "/admin/login");
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "Invalid credentials"));
     } catch (IllegalStateException ex) {

@@ -545,7 +545,9 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             userRepository.save(user);
         } else if ("teacher".equalsIgnoreCase(user.getRole()) || "admin".equalsIgnoreCase(user.getRole())) {
             user.setPortalSessionToken(UUID.randomUUID().toString());
-            user.setPortalSessionExpiresAt(LocalDateTime.now(JAPLEARN_TIME_ZONE).plusHours(12));
+            // Admin sessions are short (2 hours); teacher sessions last a school day (12 hours).
+            boolean admin = "admin".equalsIgnoreCase(user.getRole());
+            user.setPortalSessionExpiresAt(LocalDateTime.now(JAPLEARN_TIME_ZONE).plusHours(admin ? 2 : 12));
             userRepository.save(user);
         }
     

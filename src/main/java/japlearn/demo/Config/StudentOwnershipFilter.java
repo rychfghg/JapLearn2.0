@@ -5,7 +5,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,43 +28,68 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import japlearn.demo.Entity.User;
+import japlearn.demo.Repository.UserRepository;
 import japlearn.demo.Service.StudentAuthorizationService;
+import japlearn.demo.Service.StudentService;
 
 /**
- * One place that checks a student can only write THEIR OWN learning data.
- * For every route below it finds the student email (query, path or JSON body)
- * and verifies it against the X-Student-Token sent by the app.
- * Uses StudentAuthorizationService.requireOwnStudent, so it follows the
- * STUDENT_TOKEN_REQUIRED switch (transition mode: missing token allowed for old
- * app builds, but a token belonging to someone else is always rejected).
+ * One place that protects every student's learning data, for reads AND writes.
+ *
+ * For each route below it finds which student the request is about (query, path or JSON body)
+ * and allows it only for:
+ *   - that same student (their own X-Student-Token), or
+ *   - the teacher of that student's class (portal / teacher token), or
+ *   - an admin.
+ * An email address alone is never enough to READ a student's data.
+ * Writes from the student app follow the STUDENT_TOKEN_REQUIRED rollout switch.
  */
 @Component
 @Order(20)
 public class StudentOwnershipFilter extends OncePerRequestFilter {
 
     private enum Source { QUERY, BODY, PATH }
-    private record Rule(String method, Pattern path, Source source) {}
+    private record Rule(String method, Pattern path, Source source, boolean read) {}
 
     private static final List<Rule> RULES = List.of(
-        new Rule("POST", Pattern.compile("^/api/scores/(save|high-score)$"), Source.BODY),
-        new Rule("POST", Pattern.compile("^/api/users/daily-goal/(minute|complete)$"), Source.BODY),
-        new Rule("PUT", Pattern.compile("^/api/response-rush/progress$"), Source.QUERY),
-        new Rule("POST", Pattern.compile("^/api/situational/attempts$"), Source.BODY),
-        new Rule("PUT", Pattern.compile("^/api/situational/runs/current$"), Source.BODY),
-        new Rule("POST", Pattern.compile("^/api/reply-coach/attempts/start$"), Source.BODY),
-        new Rule("POST", Pattern.compile("^/api/quackTalkSessions/record$"), Source.BODY),
-        new Rule("POST", Pattern.compile("^/api/progress/([^/]+)$"), Source.PATH),
-        new Rule("POST", Pattern.compile("^/api/talk-with-sumi/(live-token|complete|reserve-response)$"), Source.BODY),
-        new Rule("POST", Pattern.compile("^/api/guided-phrase/(live-token|complete)$"), Source.BODY),
-        new Rule("POST", Pattern.compile("^/api/dialogue-relay/bonus/assess$"), Source.QUERY),
-        new Rule("POST", Pattern.compile("^/api/students/joinClass$"), Source.QUERY)
+        // ---- writes (saving a student's own data)
+        new Rule("POST", Pattern.compile("^/api/scores/(save|high-score)$"), Source.BODY, false),
+        new Rule("POST", Pattern.compile("^/api/users/daily-goal/(minute|complete)$"), Source.BODY, false),
+        new Rule("PUT", Pattern.compile("^/api/response-rush/progress$"), Source.QUERY, false),
+        new Rule("POST", Pattern.compile("^/api/situational/attempts$"), Source.BODY, false),
+        new Rule("PUT", Pattern.compile("^/api/situational/runs/current$"), Source.BODY, false),
+        new Rule("POST", Pattern.compile("^/api/reply-coach/attempts/start$"), Source.BODY, false),
+        new Rule("POST", Pattern.compile("^/api/quackTalkSessions/record$"), Source.BODY, false),
+        new Rule("POST", Pattern.compile("^/api/progress/([^/]+)$"), Source.PATH, false),
+        new Rule("POST", Pattern.compile("^/api/talk-with-sumi/(live-token|complete|reserve-response)$"), Source.BODY, false),
+        new Rule("POST", Pattern.compile("^/api/guided-phrase/(live-token|complete)$"), Source.BODY, false),
+        new Rule("POST", Pattern.compile("^/api/dialogue-relay/bonus/assess$"), Source.QUERY, false),
+        new Rule("POST", Pattern.compile("^/api/students/joinClass$"), Source.QUERY, false),
+        // ---- reads (a student's scores, progress, history, analytics)
+        new Rule("GET", Pattern.compile("^/api/progress/(?!teacher$)([^/]+)$"), Source.PATH, true),
+        new Rule("GET", Pattern.compile("^/api/scores/(student|high-score)$"), Source.QUERY, true),
+        new Rule("GET", Pattern.compile("^/api/quackTalkSessions$"), Source.QUERY, true),
+        new Rule("GET", Pattern.compile("^/api/communicationAnalytics/getStudentAnalytics$"), Source.QUERY, true),
+        new Rule("GET", Pattern.compile("^/api/quackProgress/(analytics|progression)$"), Source.QUERY, true),
+        new Rule("GET", Pattern.compile("^/api/guided-phrase/(history|status)$"), Source.QUERY, true),
+        new Rule("GET", Pattern.compile("^/api/reply-coach/(attempts|progress)$"), Source.QUERY, true),
+        new Rule("GET", Pattern.compile("^/api/situational/(attempts|best|runs/current|expression-match/progress)$"), Source.QUERY, true),
+        new Rule("GET", Pattern.compile("^/api/response-rush/progress$"), Source.QUERY, true),
+        new Rule("GET", Pattern.compile("^/api/users/daily-goal/streak$"), Source.QUERY, true),
+        new Rule("GET", Pattern.compile("^/api/students/getStudentByEmail$"), Source.QUERY, true)
     );
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private final StudentAuthorizationService students;
+    private static final ZoneId ZONE = ZoneId.of("Asia/Manila");
 
-    public StudentOwnershipFilter(StudentAuthorizationService students) {
+    private final StudentAuthorizationService students;
+    private final UserRepository users;
+    private final StudentService studentService;
+
+    public StudentOwnershipFilter(StudentAuthorizationService students, UserRepository users, StudentService studentService) {
         this.students = students;
+        this.users = users;
+        this.studentService = studentService;
     }
 
     @Override
@@ -95,15 +124,50 @@ public class StudentOwnershipFilter extends OncePerRequestFilter {
             }
         }
 
+        // Reads with no student named (e.g. an empty lookup) return nothing anyway.
+        if (rule.read() && (email == null || email.isBlank())) { chain.doFilter(forward, response); return; }
+
+        // Staff path: admin sees any student; a teacher only students in their own classes.
+        String staffToken = firstNonBlank(request.getHeader("X-Portal-Token"), request.getHeader("X-Teacher-Token"));
+        if (staffToken != null) {
+            if (staffMayAccess(staffToken, email)) { chain.doFilter(forward, response); return; }
+            deny(response, 403);
+            return;
+        }
+
+        // Student path: their own token. Reads always need it; writes follow the rollout switch.
         try {
-            students.requireOwnStudent(email, request.getHeader("X-Student-Token"));
+            students.requireOwnStudent(email, request.getHeader("X-Student-Token"), rule.read());
         } catch (ResponseStatusException e) {
-            response.setStatus(e.getStatusCode().value());
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Please sign in again to continue.\"}");
+            deny(response, e.getStatusCode().value());
             return;
         }
         chain.doFilter(forward, response);
+    }
+
+    private boolean staffMayAccess(String token, String studentEmail) {
+        User staff = users.findByPortalSessionToken(token);
+        boolean valid = staff != null && staff.getPortalSessionToken() != null && staff.getPortalSessionExpiresAt() != null
+                && MessageDigest.isEqual(staff.getPortalSessionToken().getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8))
+                && LocalDateTime.now(ZONE).isBefore(staff.getPortalSessionExpiresAt());
+        if (!valid) return false;
+        String role = String.valueOf(staff.getRole()).toLowerCase(Locale.ROOT);
+        if (role.equals("admin")) return true;
+        if (!role.equals("teacher") || !staff.isApproved()) return false;
+        String target = studentEmail == null ? "" : studentEmail.trim().toLowerCase(Locale.ROOT);
+        return studentService.getStudentsForTeacher(staff.getEmail()).stream()
+                .anyMatch((s) -> s.getEmail() != null && s.getEmail().trim().equalsIgnoreCase(target));
+    }
+
+    private static void deny(HttpServletResponse response, int status) throws IOException {
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\":\"Please sign in again to continue.\"}");
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        if (a != null && !a.isBlank()) return a.trim();
+        return b == null || b.isBlank() ? null : b.trim();
     }
 
     /** Request wrapper that replays an already-read body. */
