@@ -85,6 +85,7 @@ public class SmartGoalsService {
             "SMART 3 uses QuackSituate Politeness plus Reply Coach questions an admin has explicitly tagged as politeness. Expression Match and Response Rush do not store per-question answers, so their items cannot be tagged and are not counted.",
             "Students without records are 'No participation' and students with only unfinished runs are 'Incomplete'; neither is counted as zero.",
             "Completion = completed assigned activities / assigned activities. Only assignments created on this dashboard count, each once per student, and only after their due date. Voluntary play is never counted as an assignment.",
+            "An assignment is completed only from finished game records inside its window (QuackSituate runs marked completed, Reply Coach chapters marked COMPLETED, finished Response Rush and Dialogue Relay runs, Talk with Sumi sessions with at least one learner turn, completed Guided Phrase sessions). Started or in-progress records never count. When an assignment requires several levels, chapters, runs or sessions, each distinct one counts once and all must be finished.",
             "A goal shows 'Insufficient Data' when its denominator is 0.");
 
     private final UserRepository users;
@@ -117,7 +118,13 @@ public class SmartGoalsService {
         this.assignments = assignments;
     }
 
-    public record Filters(LocalDate from, LocalDate to, String classCode, String studentId, String module, boolean includeUnapproved) {}
+    /** onlyStudentIds: when not null, the cohort is limited to these accounts (e.g. survey respondents matched by email). */
+    public record Filters(LocalDate from, LocalDate to, String classCode, String studentId, String module, boolean includeUnapproved,
+            Set<String> onlyStudentIds, String population) {
+        public Filters(LocalDate from, LocalDate to, String classCode, String studentId, String module, boolean includeUnapproved) {
+            this(from, to, classCode, studentId, module, includeUnapproved, null, "ALL_ELIGIBLE");
+        }
+    }
 
     /** Running tally for one objective (per student or for the cohort). */
     static final class Tally {
@@ -199,6 +206,7 @@ public class SmartGoalsService {
             String cls = classOf.get(u.getEmail().trim().toLowerCase(Locale.ROOT));
             if (f.classCode() != null && !f.classCode().isBlank() && !f.classCode().equals(cls)) continue;
             if (f.studentId() != null && !f.studentId().isBlank() && !f.studentId().equals(u.getId())) continue;
+            if (f.onlyStudentIds() != null && !f.onlyStudentIds().contains(u.getId())) continue;
             StudentRow row = new StudentRow(u, cls);
             cohort.put(row.email, row);
         }
@@ -465,6 +473,7 @@ public class SmartGoalsService {
         filters.put("studentId", f.studentId());
         filters.put("module", f.module() == null || f.module().isBlank() ? "ALL" : f.module().toUpperCase(Locale.ROOT));
         filters.put("includeUnapproved", f.includeUnapproved());
+        filters.put("population", f.population() == null ? "ALL_ELIGIBLE" : f.population());
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("methodVersion", METHOD_VERSION);
@@ -515,52 +524,65 @@ public class SmartGoalsService {
         return g;
     }
 
-    /** When (if at all) the student completed this assignment inside its window. */
+    /**
+     * When (if at all) the student met this assignment's completion requirement inside its window.
+     * Only finished records count; started or in-progress records never do. Each distinct unit (a level/set,
+     * a chapter, a run, a session, a practice session) counts once, and the assignment is complete when the
+     * student has finished the required number of units. Returns the time the last required unit was finished.
+     */
     private Instant completedAt(SmartCommunicationAssignment a, String email,
             Map<String, List<SituationalAttempt>> sit, Map<String, List<ReplyCoachAttempt>> coach,
             Map<String, List<Score>> scoreMap, Map<String, List<QuackTalkSession>> talks,
             Map<String, List<GuidedPhraseDailyPractice>> guided) {
         Instant start = a.getStartsAt(), due = a.getDueAt();
         String key = upper(a.getActivityKey());
-        Instant best = null;
+        Map<String, Instant> units = new java.util.HashMap<>();
+        java.util.function.BiConsumer<String, Instant> unit = (id, at) -> units.merge(id, at, (x, y) -> y.isBefore(x) ? y : x);
         switch (key) {
             case "RECOGNITION", "EXPRESSION_MATCH", "POLITENESS" -> {
                 for (SituationalAttempt s : sit.getOrDefault(email, List.of()))
                     if (s.isCompleted() && key.equals(upper(s.getGameType()))
                             && (a.getLevel() == null || a.getLevel() == s.getLevel())
-                            && within(s.getCompletedAt(), start, due)) best = earliest(best, s.getCompletedAt());
+                            && within(s.getCompletedAt(), start, due)) unit.accept(s.getLevel() + "|" + s.getSetNumber(), s.getCompletedAt());
             }
             case "REPLY_COACH" -> {
                 for (ReplyCoachAttempt r : coach.getOrDefault(email, List.of()))
-                    if ("COMPLETED".equalsIgnoreCase(r.getStatus())
+                    if ("COMPLETED".equalsIgnoreCase(r.getStatus()) && r.getChapterId() != null
                             && (a.getChapterId() == null || a.getChapterId().equals(r.getChapterId()))
-                            && within(r.getCompletedAt(), start, due)) best = earliest(best, r.getCompletedAt());
+                            && within(r.getCompletedAt(), start, due)) unit.accept(r.getChapterId(), r.getCompletedAt());
             }
             case "RESPONSE_RUSH", "DIALOGUE_RELAY" -> {
                 String game = key.equals("RESPONSE_RUSH") ? "QUACKRESPONSE_RUSH" : "QUACKRESPONSE_RELAY";
-                for (Score s : scoreMap.getOrDefault(email, List.of()))
-                    if (s.isCompleted() && game.equalsIgnoreCase(s.getGame()) && within(scoreTime(s), start, due))
-                        best = earliest(best, scoreTime(s));
+                for (Score s : scoreMap.getOrDefault(email, List.of())) {
+                    Instant at = scoreTime(s);
+                    if (s.isCompleted() && game.equalsIgnoreCase(s.getGame()) && within(at, start, due))
+                        unit.accept(s.getId() != null ? s.getId() : String.valueOf(at), at);
+                }
             }
             case "QUACKTALK", "TALK_WITH_SUMI" -> {
+                // A session with no learner turns was opened but not actually done.
                 for (QuackTalkSession t : talks.getOrDefault(email, List.of()))
-                    if (t.isCompleted() && (key.equals("QUACKTALK") || "TALK_WITH_SUMI".equalsIgnoreCase(t.getRoomType()))
-                            && within(t.getPracticedAt(), start, due)) best = earliest(best, t.getPracticedAt());
+                    if (t.isCompleted() && t.getConversationTurns() > 0
+                            && (key.equals("QUACKTALK") || "TALK_WITH_SUMI".equalsIgnoreCase(t.getRoomType()))
+                            && within(t.getPracticedAt(), start, due)) unit.accept(t.getId() != null ? t.getId() : String.valueOf(t.getPracticedAt()), t.getPracticedAt());
             }
             case "GUIDED_PHRASE" -> {
-                // Guided Phrase keeps one record per learner per day with a completed-session count.
+                // One record per learner per day: each completed (not merely started) session is a unit.
                 LocalDate first = start.atZone(ZONE).toLocalDate(), last = due.atZone(ZONE).toLocalDate();
                 for (GuidedPhraseDailyPractice g : guided.getOrDefault(email, List.of())) {
                     if (g.getSessionsCompleted() <= 0 || g.getPracticeDate() == null) continue;
                     LocalDate day;
                     try { day = LocalDate.parse(g.getPracticeDate()); } catch (Exception e) { continue; }
                     if (day.isBefore(first) || day.isAfter(last)) continue;
-                    best = earliest(best, g.getUpdatedAt() != null ? g.getUpdatedAt() : day.atStartOfDay(ZONE).toInstant());
+                    Instant at = g.getUpdatedAt() != null ? g.getUpdatedAt() : day.atStartOfDay(ZONE).toInstant();
+                    for (int i = 0; i < g.getSessionsCompleted(); i++) unit.accept(day + "#" + i, at);
                 }
             }
             default -> { }
         }
-        return best;
+        int required = Math.max(1, a.getRequiredCount() == null ? 1 : a.getRequiredCount());
+        if (units.size() < required) return null;
+        return units.values().stream().sorted().skip(required - 1).findFirst().orElse(null);
     }
 
     public static Map<String, Object> assignmentView(SmartCommunicationAssignment a, Map<String, String> classTitles) {
@@ -572,6 +594,7 @@ public class SmartGoalsService {
         m.put("activityKey", a.getActivityKey());
         m.put("level", a.getLevel());
         m.put("chapterId", a.getChapterId());
+        m.put("requiredCount", a.getRequiredCount() == null ? 1 : a.getRequiredCount());
         m.put("startsAt", a.getStartsAt());
         m.put("dueAt", a.getDueAt());
         m.put("createdAt", a.getCreatedAt());

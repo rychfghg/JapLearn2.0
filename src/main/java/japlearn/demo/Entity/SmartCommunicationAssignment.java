@@ -18,6 +18,8 @@ public class SmartCommunicationAssignment {
     private String activityKey;
     private Integer level;
     private String chapterId;
+    /** How many distinct finished units (levels/sets, chapters, runs or sessions) complete this assignment. Default 1. */
+    private Integer requiredCount;
     private String title;
     private Instant startsAt;
     private Instant dueAt;
@@ -34,6 +36,8 @@ public class SmartCommunicationAssignment {
     public void setLevel(Integer level) { this.level = level; }
     public String getChapterId() { return chapterId; }
     public void setChapterId(String chapterId) { this.chapterId = chapterId; }
+    public Integer getRequiredCount() { return requiredCount; }
+    public void setRequiredCount(Integer requiredCount) { this.requiredCount = requiredCount; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public Instant getStartsAt() { return startsAt; }

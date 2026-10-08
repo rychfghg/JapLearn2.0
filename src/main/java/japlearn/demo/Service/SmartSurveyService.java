@@ -203,6 +203,15 @@ public class SmartSurveyService {
         return out;
     }
 
+    /** Accounts matched by email in this upload (counted rows only); used to limit the SMART cohort to respondents. */
+    public Set<String> matchedStudentIds(String surveyId) {
+        SmartSurveyUpload u = uploads.findById(surveyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Questionnaire upload not found."));
+        Set<String> ids = new HashSet<>();
+        for (SmartSurveyUpload.Row row : u.getRows()) if (row.isCounted() && row.getStudentId() != null) ids.add(row.getStudentId());
+        return ids;
+    }
+
     private static final String[] GOAL_KEYS = { "SMART1", "SMART2", "SMART3", "SMART4" };
     /** Questionnaire group index (Q pairs) for each SMART goal: Q1-2, Q3-4, Q5-6, Q9-10. */
     private static final int[] GOAL_GROUP = { 0, 1, 2, 4 };

@@ -50,14 +50,24 @@ public class AdminSmartGoalsController {
     }
 
     @GetMapping("/report")
-    public Map<String, Object> report(
+    public ResponseEntity<?> report(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String classCode,
             @RequestParam(required = false) String studentId,
             @RequestParam(required = false) String module,
-            @RequestParam(defaultValue = "false") boolean includeUnapproved) {
-        return goals.report(new SmartGoalsService.Filters(from, to, classCode, studentId, module, includeUnapproved));
+            @RequestParam(defaultValue = "false") boolean includeUnapproved,
+            @RequestParam(required = false) String surveyId) {
+        // surveyId given: calculate only for students whose account email matched a respondent in that upload.
+        if (surveyId != null && !surveyId.isBlank()) {
+            try {
+                return ResponseEntity.ok(goals.report(new SmartGoalsService.Filters(from, to, classCode, studentId, module, includeUnapproved,
+                        surveys.matchedStudentIds(surveyId), "SURVEY_MATCHED")));
+            } catch (ResponseStatusException e) {
+                return ResponseEntity.status(e.getStatusCode()).body(Map.of("error", String.valueOf(e.getReason())));
+            }
+        }
+        return ResponseEntity.ok(goals.report(new SmartGoalsService.Filters(from, to, classCode, studentId, module, includeUnapproved)));
     }
 
     @GetMapping("/assignments")
@@ -66,7 +76,7 @@ public class AdminSmartGoalsController {
         return assignments.findAllByOrderByDueAtDesc().stream().map(a -> SmartGoalsService.assignmentView(a, titles)).toList();
     }
 
-    public record AssignmentRequest(String classCode, String activityKey, Integer level, String chapterId, String title,
+    public record AssignmentRequest(String classCode, String activityKey, Integer level, String chapterId, Integer requiredCount, String title,
             Instant startsAt, Instant dueAt) {}
 
     @PostMapping("/assignments")
@@ -78,6 +88,7 @@ public class AdminSmartGoalsController {
         if (request.classCode() == null || classes.findByClassCodes(request.classCode().trim()).isEmpty()) return error("Choose an existing class.");
         if (request.startsAt() == null || request.dueAt() == null || !request.dueAt().isAfter(request.startsAt())) return error("The due date must be after the start date.");
         if (request.level() != null && (request.level() < 1 || request.level() > 3)) return error("Level must be 1 to 3.");
+        if (request.requiredCount() != null && (request.requiredCount() < 1 || request.requiredCount() > 20)) return error("Required completions must be 1 to 20.");
         String title = request.title() == null ? "" : request.title().replaceAll("[\\p{Cntrl}<>]", " ").trim();
         if (title.length() > 80) title = title.substring(0, 80);
         String chapter = request.chapterId() == null || request.chapterId().isBlank() ? null : request.chapterId().trim();
@@ -88,6 +99,7 @@ public class AdminSmartGoalsController {
         a.setActivityKey(key);
         a.setLevel(key.equals("RECOGNITION") || key.equals("EXPRESSION_MATCH") || key.equals("POLITENESS") ? request.level() : null);
         a.setChapterId(key.equals("REPLY_COACH") ? chapter : null);
+        a.setRequiredCount(request.requiredCount() == null ? 1 : request.requiredCount());
         a.setTitle(title.isEmpty() ? key : title);
         a.setStartsAt(request.startsAt());
         a.setDueAt(request.dueAt());

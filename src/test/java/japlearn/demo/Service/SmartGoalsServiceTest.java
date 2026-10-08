@@ -37,12 +37,13 @@ class SmartGoalsServiceTest {
     private final StudentRepository students = mock(StudentRepository.class);
     private final SituationalAttemptRepository situational = mock(SituationalAttemptRepository.class);
     private final ReplyCoachAttemptRepository coach = mock(ReplyCoachAttemptRepository.class);
+    private final SmartCommunicationAssignmentRepository assignmentRepo = mock(SmartCommunicationAssignmentRepository.class);
     private final ScoreRepository scoreRepo = mock(ScoreRepository.class);
     private final QuackTalkSessionRepository talkRepo = mock(QuackTalkSessionRepository.class);
     private final japlearn.demo.Repository.ReplyCoachChapterRepository chapterRepo = mock(japlearn.demo.Repository.ReplyCoachChapterRepository.class);
     private final SmartGoalsService service = new SmartGoalsService(users, students, mock(ClassesRepository.class),
             situational, coach, scoreRepo, mock(ResponseRushProgressRepository.class),
-            talkRepo, mock(SmartCommunicationAssignmentRepository.class),
+            talkRepo, assignmentRepo,
             chapterRepo, mock(japlearn.demo.Repository.GuidedPhraseDailyPracticeRepository.class));
 
     private static User student(String id, String email) {
@@ -199,6 +200,33 @@ class SmartGoalsServiceTest {
         assertThat(s3.get("correct")).isEqualTo(0);
         assertThat(s3.get("total")).isEqualTo(1);
         assertThat(s3.get("status")).isEqualTo("NOT_ACHIEVED");
+    }
+
+
+    @Test
+    void completionNeedsEveryRequiredUnitFinishedAndIgnoresStartedRuns() {
+        when(users.findByRoleIgnoreCase("student")).thenReturn(List.of(student("1", "ana@gmail.com"), student("2", "ben@gmail.com"), student("3", "cy@gmail.com")));
+        List<Student> inClass = new ArrayList<>();
+        for (String e : List.of("ana@gmail.com", "ben@gmail.com")) { Student st = new Student(); st.setEmail(e); st.setClassCode("C1"); inClass.add(st); }
+        when(students.findAll()).thenReturn(inClass); // cy has no class, so is not assigned
+        SituationalAttempt l2 = run("ana@gmail.com", "POLITENESS", 5, 10, true, "2026-09-02T00:00:00Z"); l2.setLevel(2);
+        when(situational.findAll()).thenReturn(List.of(
+                run("ana@gmail.com", "POLITENESS", 8, 10, true, "2026-09-01T00:00:00Z"), l2,
+                run("ben@gmail.com", "POLITENESS", 8, 10, true, "2026-09-01T00:00:00Z"),
+                run("ben@gmail.com", "POLITENESS", 8, 10, true, "2026-09-01T05:00:00Z"), // same level again: one unit
+                run("cy@gmail.com", "POLITENESS", 9, 10, true, "2026-09-01T00:00:00Z")));
+        when(coach.findAll()).thenReturn(List.of());
+        japlearn.demo.Entity.SmartCommunicationAssignment a = new japlearn.demo.Entity.SmartCommunicationAssignment();
+        a.setId("a1"); a.setClassCode("C1"); a.setActivityKey("POLITENESS"); a.setRequiredCount(2);
+        a.setStartsAt(Instant.parse("2026-08-31T00:00:00Z")); a.setDueAt(Instant.parse("2026-09-10T00:00:00Z"));
+        when(assignmentRepo.findAllByOrderByDueAtDesc()).thenReturn(List.of(a));
+
+        Map<String, Object> report = service.report(new SmartGoalsService.Filters(null, null, null, null, null, false));
+        Map<String, Object> s4 = goal(report, "SMART4");
+        assertThat(s4.get("correct")).isEqualTo(1);
+        assertThat(s4.get("total")).isEqualTo(2);
+        assertThat(s4.get("percentage")).isEqualTo(50.0);
+        assertThat(s4.get("status")).isEqualTo("NOT_ACHIEVED");
     }
 
 }
