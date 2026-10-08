@@ -74,7 +74,8 @@ public class SmartGoalsService {
             "QUACKTALK", Set.of("TALK_WITH_SUMI", "GUIDED_PHRASE"));
 
     public static final List<String> RULES = List.of(
-            "Accuracy = correct scored answers / total scored answers x 100, summed across eligible students (not an average of student percentages).",
+            "Goals 1-3 (goal attainment) = students whose own accuracy reaches the target / ALL qualified students x 100. Qualified = every eligible student, or every survey respondent matched by email when that option is chosen. Students with no records stay in the denominator and count as not meeting the target. A goal is Achieved when that share is at least the goal percentage (e.g. 80% of students at 80% accuracy or more).",
+            "Each student's own accuracy = their correct scored answers / their total scored answers. Answer accuracy among measured students only is shown as secondary information and is not used for the status.",
             "Only the first evaluation attempt counts: the earliest completed run of each QuackSituate level/set, the earliest Response Rush and Dialogue Relay runs, the first Reply Coach attempt of each chapter, and the first Talk with Sumi session with per-turn scores, inside the selected period.",
             "QuackSituate games (Ahiru Rescue, Expression Match, Politeness) give one answer per question, so a run's correct/total already reflects the first scored answer of each item. In Reply Coach the first answer recorded for each dialogue node is used.",
             "Reply Coach and Response Rush answers rated BEST or ACCEPTABLE are correct; AWKWARD, IMPOLITE, RUDE and TIMEOUT are scored incorrect.",
@@ -546,25 +547,38 @@ public class SmartGoalsService {
 
     private Map<String, Object> goal(String key, String name, int target, Map<String, StudentRow> cohort, String goalKey,
             String evidence, List<String> limitations) {
-        int correct = 0, total = 0, participating = 0, incomplete = 0, none = 0;
+        // Goal attainment (headline): students whose own accuracy reaches the target / ALL qualified students.
+        // Students without records stay in the denominator and simply have not met the target.
+        int correct = 0, total = 0, participating = 0, incomplete = 0, none = 0, met = 0, below = 0;
         Instant last = null;
         for (StudentRow row : cohort.values()) {
             Tally t = row.goals.get(goalKey);
             correct += t.correct;
             total += t.total;
-            if (t.total > 0) participating++;
+            if (t.total > 0) {
+                participating++;
+                if (t.correct * 100.0 / t.total >= target) met++; else below++;
+            }
             else if (t.incomplete) incomplete++;
             else none++;
             if (t.last != null && (last == null || t.last.isAfter(last))) last = t.last;
         }
+        int qualified = cohort.size();
         Map<String, Object> g = new LinkedHashMap<>();
         g.put("key", key);
         g.put("name", name);
         g.put("target", target);
-        g.put("correct", correct);
-        g.put("total", total);
-        g.put("percentage", total > 0 ? round(correct * 100.0 / total) : null);
-        g.put("status", total == 0 ? "INSUFFICIENT_DATA" : correct * 100.0 / total >= target ? "ACHIEVED" : "NOT_ACHIEVED");
+        g.put("correct", met);
+        g.put("total", qualified);
+        g.put("percentage", qualified > 0 && participating > 0 ? round(met * 100.0 / qualified) : null);
+        g.put("status", qualified == 0 || participating == 0 ? "INSUFFICIENT_DATA" : met * 100.0 / qualified >= target ? "ACHIEVED" : "NOT_ACHIEVED");
+        g.put("measure", "STUDENTS_MEETING_TARGET");
+        g.put("studentsMet", met);
+        g.put("studentsBelow", below);
+        // Secondary: answer accuracy among measured students only (not used for the status).
+        g.put("answerCorrect", correct);
+        g.put("answerTotal", total);
+        g.put("answerPercentage", total > 0 ? round(correct * 100.0 / total) : null);
         g.put("eligibleStudents", cohort.size());
         g.put("participatingStudents", participating);
         g.put("noParticipation", none);

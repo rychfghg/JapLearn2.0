@@ -270,19 +270,23 @@ public class SmartSurveyService {
                 out.put(GOAL_KEYS[g], cell);
                 sAgree[g] += agree; sValid[g] += valid;
                 if (measured) {
-                    aCorrect[g] += ((Number) metric.get("correct")).intValue();
-                    aTotal[g] += ((Number) metric.get("total")).intValue();
                     measuredStudents[g]++;
+                    if (g == 3) { // completion: activities done / 8 per matched student
+                        aCorrect[g] += ((Number) metric.get("correct")).intValue();
+                        aTotal[g] += ((Number) metric.get("total")).intValue();
+                    } else if (actualPct != null && actualPct >= GOAL_TARGET[g]) aCorrect[g]++;
                 }
+                if (g != 3) aTotal[g]++; // every matched student counts, measured or not
             }
             students.add(out);
         }
         students.sort(java.util.Comparator.comparing(m -> String.valueOf(m.get("name")).toLowerCase(Locale.ROOT)));
 
+        // Goals 1-3: matched students meeting the target / all matched students (Option A). Goal 4: completion.
         List<Map<String, Object>> overall = new ArrayList<>();
         for (int g = 0; g < 4; g++) {
             Double s = sValid[g] > 0 ? SmartGoalsService.round(sAgree[g] * 100.0 / sValid[g]) : null;
-            Double a = aTotal[g] > 0 ? SmartGoalsService.round(aCorrect[g] * 100.0 / aTotal[g]) : null;
+            Double a = aTotal[g] > 0 && measuredStudents[g] > 0 ? SmartGoalsService.round(aCorrect[g] * 100.0 / aTotal[g]) : null;
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("key", GOAL_KEYS[g]);
             m.put("target", GOAL_TARGET[g]);

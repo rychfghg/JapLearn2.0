@@ -74,9 +74,10 @@ class SmartGoalsServiceTest {
 
         Map<String, Object> report = service.report(new SmartGoalsService.Filters(null, null, null, null, null, false));
         Map<String, Object> s1 = goal(report, "SMART1");
-        assertThat(s1.get("correct")).isEqualTo(15);
-        assertThat(s1.get("total")).isEqualTo(20);
-        assertThat(s1.get("percentage")).isEqualTo(75.0);
+        assertThat(s1.get("answerCorrect")).isEqualTo(15);
+        assertThat(s1.get("answerTotal")).isEqualTo(20);
+        assertThat(s1.get("answerPercentage")).isEqualTo(75.0);
+        assertThat(s1.get("percentage")).isEqualTo(33.3); // only ben (9/10) meets 80%, out of all 3 students
         assertThat(s1.get("status")).isEqualTo("NOT_ACHIEVED");
         assertThat(s1.get("noParticipation")).isEqualTo(1);
 
@@ -101,8 +102,8 @@ class SmartGoalsServiceTest {
         when(coach.findAll()).thenReturn(List.of(second, first));
 
         Map<String, Object> s2 = goal(service.report(new SmartGoalsService.Filters(null, null, null, null, "QUACKRESPONSE", false)), "SMART2");
-        assertThat(s2.get("correct")).isEqualTo(2);
-        assertThat(s2.get("total")).isEqualTo(3);
+        assertThat(s2.get("answerCorrect")).isEqualTo(2);
+        assertThat(s2.get("answerTotal")).isEqualTo(3);
     }
 
     private static ReplyCoachAttempt.AnswerRecord answer(String node, String evaluation) {
@@ -192,11 +193,11 @@ class SmartGoalsServiceTest {
 
         Map<String, Object> report = service.report(new SmartGoalsService.Filters(null, null, null, null, null, false));
         Map<String, Object> s2 = goal(report, "SMART2");
-        assertThat(s2.get("correct")).isEqualTo(24 + 1 + 1); // relay + one passing Sumi turn + one good Reply Coach answer
-        assertThat(s2.get("total")).isEqualTo(30 + 3 + 2);
+        assertThat(s2.get("answerCorrect")).isEqualTo(24 + 1 + 1); // relay + one passing Sumi turn + one good Reply Coach answer
+        assertThat(s2.get("answerTotal")).isEqualTo(30 + 3 + 2);
         Map<String, Object> s3 = goal(report, "SMART3");
-        assertThat(s3.get("correct")).isEqualTo(0);
-        assertThat(s3.get("total")).isEqualTo(1);
+        assertThat(s3.get("answerCorrect")).isEqualTo(0);
+        assertThat(s3.get("answerTotal")).isEqualTo(1);
         assertThat(s3.get("status")).isEqualTo("NOT_ACHIEVED");
     }
 
