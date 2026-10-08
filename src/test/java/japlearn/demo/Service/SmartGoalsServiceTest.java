@@ -37,9 +37,13 @@ class SmartGoalsServiceTest {
     private final StudentRepository students = mock(StudentRepository.class);
     private final SituationalAttemptRepository situational = mock(SituationalAttemptRepository.class);
     private final ReplyCoachAttemptRepository coach = mock(ReplyCoachAttemptRepository.class);
+    private final ScoreRepository scoreRepo = mock(ScoreRepository.class);
+    private final QuackTalkSessionRepository talkRepo = mock(QuackTalkSessionRepository.class);
+    private final japlearn.demo.Repository.ReplyCoachChapterRepository chapterRepo = mock(japlearn.demo.Repository.ReplyCoachChapterRepository.class);
     private final SmartGoalsService service = new SmartGoalsService(users, students, mock(ClassesRepository.class),
-            situational, coach, mock(ScoreRepository.class), mock(ResponseRushProgressRepository.class),
-            mock(QuackTalkSessionRepository.class), mock(SmartCommunicationAssignmentRepository.class));
+            situational, coach, scoreRepo, mock(ResponseRushProgressRepository.class),
+            talkRepo, mock(SmartCommunicationAssignmentRepository.class),
+            chapterRepo, mock(japlearn.demo.Repository.GuidedPhraseDailyPracticeRepository.class));
 
     private static User student(String id, String email) {
         User u = new User();
@@ -157,4 +161,44 @@ class SmartGoalsServiceTest {
         assertThatThrownBy(() -> surveys.upload(new SmartSurveyService.UploadRequest("form.csv", csv.toString(),
                 List.of(0, 1, 4, 5, 6, 7, 8, 9, 10, 11), null, false), "admin")).isInstanceOf(ResponseStatusException.class);
     }
+
+    @Test
+    void countsRelaySumiTurnsAndTaggedPolitenessQuestions() {
+        when(users.findByRoleIgnoreCase("student")).thenReturn(List.of(student("1", "ana@gmail.com")));
+        when(students.findAll()).thenReturn(List.of());
+        when(situational.findAll()).thenReturn(List.of());
+        japlearn.demo.Entity.Score relay = new japlearn.demo.Entity.Score();
+        relay.setEmail("ana@gmail.com"); relay.setGame("QUACKRESPONSE_RELAY"); relay.setCorrectAnswers(24); relay.setTotalQuestions(30);
+        relay.setCompleted(true); relay.setDate("2026-09-01T00:00:00Z");
+        when(scoreRepo.findAll()).thenReturn(List.of(relay));
+        japlearn.demo.Entity.QuackTalkSession old = new japlearn.demo.Entity.QuackTalkSession();
+        old.setEmail("ana@gmail.com"); old.setRoomType("TALK_WITH_SUMI"); old.setCompleted(true); old.setContextualAccuracy(90);
+        old.setPracticedAt(Instant.parse("2026-08-01T00:00:00Z")); // no per-turn scores: not measurable
+        japlearn.demo.Entity.QuackTalkSession sumi = new japlearn.demo.Entity.QuackTalkSession();
+        sumi.setEmail("ana@gmail.com"); sumi.setRoomType("TALK_WITH_SUMI"); sumi.setCompleted(true); sumi.setPracticedAt(Instant.parse("2026-09-02T00:00:00Z"));
+        sumi.setPronunciationScore(10);
+        sumi.setContextEvaluations(List.of(Map.of("contextScore", 80, "japaneseAttempted", true),
+                Map.of("contextScore", 95, "japaneseAttempted", false), Map.of("contextScore", 40, "japaneseAttempted", true)));
+        when(talkRepo.findAll()).thenReturn(List.of(old, sumi));
+        japlearn.demo.Entity.ReplyCoachChapter chapter = new japlearn.demo.Entity.ReplyCoachChapter();
+        chapter.setId("ch1");
+        japlearn.demo.Entity.ReplyCoachChapter.StoryNode tagged = new japlearn.demo.Entity.ReplyCoachChapter.StoryNode();
+        tagged.setId("n2"); tagged.setAssessesPoliteness(true);
+        chapter.setNodes(new ArrayList<>(List.of(tagged)));
+        when(chapterRepo.findAll()).thenReturn(List.of(chapter));
+        ReplyCoachAttempt attempt = new ReplyCoachAttempt();
+        attempt.setEmail("ana@gmail.com"); attempt.setChapterId("ch1"); attempt.setAttemptNumber(1); attempt.setStartedAt(Instant.parse("2026-09-03T00:00:00Z"));
+        attempt.setAnswers(new ArrayList<>(List.of(answer("n1", "BEST"), answer("n2", "IMPOLITE"))));
+        when(coach.findAll()).thenReturn(List.of(attempt));
+
+        Map<String, Object> report = service.report(new SmartGoalsService.Filters(null, null, null, null, null, false));
+        Map<String, Object> s2 = goal(report, "SMART2");
+        assertThat(s2.get("correct")).isEqualTo(24 + 1 + 1); // relay + one passing Sumi turn + one good Reply Coach answer
+        assertThat(s2.get("total")).isEqualTo(30 + 3 + 2);
+        Map<String, Object> s3 = goal(report, "SMART3");
+        assertThat(s3.get("correct")).isEqualTo(0);
+        assertThat(s3.get("total")).isEqualTo(1);
+        assertThat(s3.get("status")).isEqualTo("NOT_ACHIEVED");
+    }
+
 }

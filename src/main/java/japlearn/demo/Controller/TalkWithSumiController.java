@@ -37,7 +37,7 @@ public class TalkWithSumiController {
 
     @PostMapping("/complete") public ResponseEntity<?> complete(@RequestBody Map<String,Object> request){
         String email=normalize(String.valueOf(request.getOrDefault("email","")));if(email.isBlank()||users.findByEmail(email)==null)return ResponseEntity.status(403).body(Map.of("message","A verified learner account is required."));
-        QuackTalkSession row=new QuackTalkSession();row.setEmail(email);row.setName(String.valueOf(request.getOrDefault("name","")));row.setRoomType("TALK_WITH_SUMI");row.setLanguage("JAPANESE");row.setScenarioTitle("Open Japanese conversation");row.setDurationSeconds(Math.max(1,Math.min(3600,number(request.get("durationSeconds")))));row.setConversationTurns(Math.max(0,number(request.get("conversationTurns"))));row.setCompleted(true);row.setEvaluated(row.getConversationTurns()>0);row.setPronunciationScore(score(request.get("pronunciationScore")));row.setAccuracyScore(score(request.get("accuracyScore")));row.setFluencyScore(score(request.get("fluencyScore")));row.setCompletenessScore(score(request.get("completenessScore")));row.setContextualAccuracy(score(request.get("contextualAccuracy")));row.setScore(score(request.get("score")));row.setFeedbackSummary(String.valueOf(request.getOrDefault("feedbackSummary","Keep building confidence through short, natural Japanese exchanges.")));row.setExpressionsPracticed(strings(request.get("expressionsPracticed")));row.setAreasForImprovement(strings(request.get("areasForImprovement")));row.setTurnAssessments(turnAssessments(request.get("turnAssessments")));row.setId(String.valueOf(request.getOrDefault("sessionId",java.util.UUID.randomUUID().toString())));
+        QuackTalkSession row=new QuackTalkSession();row.setEmail(email);row.setName(String.valueOf(request.getOrDefault("name","")));row.setRoomType("TALK_WITH_SUMI");row.setLanguage("JAPANESE");row.setScenarioTitle("Open Japanese conversation");row.setDurationSeconds(Math.max(1,Math.min(3600,number(request.get("durationSeconds")))));row.setConversationTurns(Math.max(0,number(request.get("conversationTurns"))));row.setCompleted(true);row.setEvaluated(row.getConversationTurns()>0);row.setPronunciationScore(score(request.get("pronunciationScore")));row.setAccuracyScore(score(request.get("accuracyScore")));row.setFluencyScore(score(request.get("fluencyScore")));row.setCompletenessScore(score(request.get("completenessScore")));row.setContextualAccuracy(score(request.get("contextualAccuracy")));row.setScore(score(request.get("score")));row.setFeedbackSummary(String.valueOf(request.getOrDefault("feedbackSummary","Keep building confidence through short, natural Japanese exchanges.")));row.setExpressionsPracticed(strings(request.get("expressionsPracticed")));row.setAreasForImprovement(strings(request.get("areasForImprovement")));row.setTurnAssessments(turnAssessments(request.get("turnAssessments")));row.setContextEvaluations(contextEvaluations(request.get("contextEvaluations")));row.setId(String.valueOf(request.getOrDefault("sessionId",java.util.UUID.randomUUID().toString())));
         var existing=sessions.findById(row.getId());
         if(existing.isPresent()&&!email.equalsIgnoreCase(existing.get().getEmail()))return ResponseEntity.status(403).build();
         row.setEvaluated(!row.getTurnAssessments().isEmpty());
@@ -65,6 +65,16 @@ public class TalkWithSumiController {
     private int number(Object value){try{double parsed=Double.parseDouble(String.valueOf(value));return Double.isFinite(parsed)?(int)Math.round(parsed):0;}catch(Exception e){return 0;}}
     private int score(Object value){return Math.max(0,Math.min(100,number(value)));}
     private List<String> strings(Object value){if(!(value instanceof List<?> values))return List.of();LinkedHashSet<String> unique=new LinkedHashSet<>();values.stream().map(String::valueOf).filter(item->!item.isBlank()).forEach(unique::add);return unique.stream().limit(30).toList();}
+    private List<Map<String,Object>> contextEvaluations(Object value){
+        if(!(value instanceof List<?> values))return List.of();
+        return values.stream().filter(Map.class::isInstance).limit(60).map(item->{
+            Map<?,?> raw=(Map<?,?>)item;
+            Map<String,Object> safe=new LinkedHashMap<>();
+            safe.put("contextScore",score(raw.get("contextScore")));
+            safe.put("japaneseAttempted",Boolean.TRUE.equals(raw.get("japaneseAttempted")));
+            return safe;
+        }).toList();
+    }
     private List<Map<String,Object>> turnAssessments(Object value){
         if(!(value instanceof List<?> values))return List.of();
         return values.stream().filter(Map.class::isInstance).limit(30).map(item->{

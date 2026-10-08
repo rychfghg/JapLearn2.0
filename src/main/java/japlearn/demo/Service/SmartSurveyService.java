@@ -88,15 +88,11 @@ public class SmartSurveyService {
                 throw bad("Question " + (q + 1) + " (\"" + clean(header.get(cols.get(q)), 80) + "\") does not contain Agree/Disagree answers. Check the column mapping.");
         }
 
-        // Verified identifiers only: account email, account id, or the dashboard's student code. Never names.
+        // Email only: the address given in the form is matched to the student account registered with it.
+        // Names (and any student ID column) are ignored, so a different name on the form does not matter.
         Map<String, String> emailToId = new java.util.HashMap<>();
-        Map<String, String> idToId = new java.util.HashMap<>();
-        for (User u : users.findByRoleIgnoreCase("student")) {
-            if (u.getId() == null) continue;
-            if (u.getEmail() != null) emailToId.put(u.getEmail().trim().toLowerCase(Locale.ROOT), u.getId());
-            idToId.put(u.getId().toLowerCase(Locale.ROOT), u.getId());
-            idToId.put(SmartGoalsService.code(u).toLowerCase(Locale.ROOT), u.getId());
-        }
+        for (User u : users.findByRoleIgnoreCase("student"))
+            if (u.getId() != null && u.getEmail() != null) emailToId.put(u.getEmail().trim().toLowerCase(Locale.ROOT), u.getId());
 
         boolean matchedOnly = Boolean.TRUE.equals(request.matchedOnly()) && idCol != null;
         SmartSurveyUpload upload = new SmartSurveyUpload();
@@ -124,15 +120,10 @@ public class SmartSurveyService {
                 noId++;
             } else {
                 String raw = cell(line, idCol);
-                String studentId;
-                if (raw.contains("@")) {
-                    String email;
-                    try { email = EmailInput.normalize(raw); } catch (RuntimeException e) { email = null; }
-                    studentId = email == null ? null : emailToId.get(email);
-                } else {
-                    studentId = idToId.get(raw.trim().toLowerCase(Locale.ROOT));
-                }
-                String key = studentId != null ? "id:" + studentId : "raw:" + raw.trim().toLowerCase(Locale.ROOT);
+                String email;
+                try { email = EmailInput.normalize(raw); } catch (RuntimeException e) { email = null; }
+                String studentId = email == null ? null : emailToId.get(email);
+                String key = email != null ? email : "raw:" + raw.trim().toLowerCase(Locale.ROOT);
                 if (!seen.add(key)) { status = "DUPLICATE"; duplicate++; }
                 else if (studentId != null) { status = "MATCHED"; matched++; row.setStudentId(studentId); }
                 else { status = "UNMATCHED"; unmatched++; }

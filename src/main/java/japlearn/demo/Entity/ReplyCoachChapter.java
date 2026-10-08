@@ -53,6 +53,8 @@ public class ReplyCoachChapter {
         private boolean spritesVisible = true;
         private boolean tapToContinue = true;
         private boolean shuffleChoices;
+        /** Set by an admin when this question explicitly assesses Japanese politeness (SMART goal 3). */
+        private boolean assessesPoliteness;
         private String nextNodeId;
         private List<ChoiceOption> choices = new ArrayList<>();
 
@@ -102,6 +104,8 @@ public class ReplyCoachChapter {
         public void setSpritesVisible(boolean spritesVisible) { this.spritesVisible = spritesVisible; }
         public boolean isTapToContinue() { return tapToContinue; }
         public void setTapToContinue(boolean tapToContinue) { this.tapToContinue = tapToContinue; }
+        public boolean isAssessesPoliteness() { return assessesPoliteness; }
+        public void setAssessesPoliteness(boolean assessesPoliteness) { this.assessesPoliteness = assessesPoliteness; }
         public boolean isShuffleChoices() { return shuffleChoices; }
         public void setShuffleChoices(boolean shuffleChoices) { this.shuffleChoices = shuffleChoices; }
         public String getNextNodeId() { return nextNodeId; }

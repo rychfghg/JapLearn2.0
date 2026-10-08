@@ -30,6 +30,10 @@ public class QuackTalkSession {
     private List<String> expressionsPracticed;
     private List<String> areasForImprovement;
     private List<Map<String,Object>> turnAssessments;
+    /** Per learner turn: contextScore (0-100) and japaneseAttempted. Recorded from Talk with Sumi sessions onward. */
+    private List<Map<String,Object>> contextEvaluations;
+    public List<Map<String,Object>> getContextEvaluations() { return contextEvaluations; }
+    public void setContextEvaluations(List<Map<String,Object>> contextEvaluations) { this.contextEvaluations = contextEvaluations; }
     private Instant practicedAt = Instant.now();
 
     public String getId() {

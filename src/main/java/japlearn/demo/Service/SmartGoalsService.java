@@ -30,7 +30,11 @@ import japlearn.demo.Entity.SituationalAttempt;
 import japlearn.demo.Entity.SmartCommunicationAssignment;
 import japlearn.demo.Entity.Student;
 import japlearn.demo.Entity.User;
+import japlearn.demo.Entity.GuidedPhraseDailyPractice;
+import japlearn.demo.Entity.ReplyCoachChapter;
 import japlearn.demo.Repository.ClassesRepository;
+import japlearn.demo.Repository.GuidedPhraseDailyPracticeRepository;
+import japlearn.demo.Repository.ReplyCoachChapterRepository;
 import japlearn.demo.Repository.QuackTalkSessionRepository;
 import japlearn.demo.Repository.ReplyCoachAttemptRepository;
 import japlearn.demo.Repository.ResponseRushProgressRepository;
@@ -48,30 +52,37 @@ import japlearn.demo.Repository.UserRepository;
 @Service
 public class SmartGoalsService {
 
-    public static final String METHOD_VERSION = "smart-eval-v1";
+    public static final String METHOD_VERSION = "smart-eval-v2";
     private static final ZoneId ZONE = ZoneId.of("Asia/Manila");
+    /** A Talk with Sumi turn counts as a correct response when it is in Japanese and its context score reaches this. */
+    public static final int SUMI_CONTEXT_PASS = 70;
 
-    /** Evidence sources and the objective each one measures. */
+    /** Evidence sources and the objective each one measures (RECOGNITION = Ahiru Rescue). */
     public static final Map<String, String> SOURCE_GOAL = Map.of(
             "RECOGNITION", "SMART1",
             "EXPRESSION_MATCH", "SMART1",
             "POLITENESS", "SMART3",
             "REPLY_COACH", "SMART2",
-            "RESPONSE_RUSH", "SMART2");
-    /** Activities a class can be assigned for objective 4. */
+            "RESPONSE_RUSH", "SMART2",
+            "DIALOGUE_RELAY", "SMART2",
+            "TALK_WITH_SUMI", "SMART2");
+    /** Activities a class can be assigned for objective 4. QUACKTALK = any QuackTalk session (older assignments). */
     public static final Set<String> ASSIGNABLE = Set.of(
-            "RECOGNITION", "EXPRESSION_MATCH", "POLITENESS", "REPLY_COACH", "RESPONSE_RUSH", "DIALOGUE_RELAY", "QUACKTALK");
+            "RECOGNITION", "EXPRESSION_MATCH", "POLITENESS", "REPLY_COACH", "RESPONSE_RUSH", "DIALOGUE_RELAY",
+            "TALK_WITH_SUMI", "GUIDED_PHRASE", "QUACKTALK");
     private static final Map<String, Set<String>> MODULES = Map.of(
             "QUACKSITUATE", Set.of("RECOGNITION", "EXPRESSION_MATCH", "POLITENESS"),
             "QUACKRESPONSE", Set.of("REPLY_COACH", "RESPONSE_RUSH", "DIALOGUE_RELAY"),
-            "QUACKTALK", Set.of("QUACKTALK"));
+            "QUACKTALK", Set.of("TALK_WITH_SUMI", "GUIDED_PHRASE", "QUACKTALK"));
 
     public static final List<String> RULES = List.of(
             "Accuracy = correct scored answers / total scored answers x 100, summed across eligible students (not an average of student percentages).",
-            "Only the first evaluation attempt counts: the earliest completed run of each QuackSituate level/set, the earliest Response Rush run, and the first Reply Coach attempt of each chapter inside the selected period.",
-            "QuackSituate games give one answer per question, so a run's correct/total already reflects the first scored answer of each item. In Reply Coach the first answer recorded for each dialogue node is used.",
+            "Only the first evaluation attempt counts: the earliest completed run of each QuackSituate level/set, the earliest Response Rush and Dialogue Relay runs, the first Reply Coach attempt of each chapter, and the first Talk with Sumi session with per-turn scores, inside the selected period.",
+            "QuackSituate games (Ahiru Rescue, Expression Match, Politeness) give one answer per question, so a run's correct/total already reflects the first scored answer of each item. In Reply Coach the first answer recorded for each dialogue node is used.",
             "Reply Coach and Response Rush answers rated BEST or ACCEPTABLE are correct; AWKWARD, IMPOLITE, RUDE and TIMEOUT are scored incorrect.",
-            "SMART 3 uses only QuackSituate Politeness (formal vs informal choice). Other situational or conversational items are not assumed to measure politeness.",
+            "Dialogue Relay: 25 dialogue choices plus the spoken bonus prompts, where a bonus counts as correct only when the reply is judged appropriate to the context (not by pronunciation).",
+            "Talk with Sumi: each learner turn is one scored response; it is correct when Japanese was attempted and the context score is at least " + SUMI_CONTEXT_PASS + "/100. Pronunciation, accuracy, fluency and completeness scores are never used. Sessions saved before per-turn context scores were recorded are not measurable.",
+            "SMART 3 uses QuackSituate Politeness plus Reply Coach questions an admin has explicitly tagged as politeness. Expression Match and Response Rush do not store per-question answers, so their items cannot be tagged and are not counted.",
             "Students without records are 'No participation' and students with only unfinished runs are 'Incomplete'; neither is counted as zero.",
             "Completion = completed assigned activities / assigned activities. Only assignments created on this dashboard count, each once per student, and only after their due date. Voluntary play is never counted as an assignment.",
             "A goal shows 'Insufficient Data' when its denominator is 0.");
@@ -85,11 +96,16 @@ public class SmartGoalsService {
     private final ResponseRushProgressRepository rushProgress;
     private final QuackTalkSessionRepository quackTalk;
     private final SmartCommunicationAssignmentRepository assignments;
+    private final ReplyCoachChapterRepository chapters;
+    private final GuidedPhraseDailyPracticeRepository guidedPractice;
 
     public SmartGoalsService(UserRepository users, StudentRepository students, ClassesRepository classes,
             SituationalAttemptRepository situational, ReplyCoachAttemptRepository replyCoach, ScoreRepository scores,
             ResponseRushProgressRepository rushProgress, QuackTalkSessionRepository quackTalk,
-            SmartCommunicationAssignmentRepository assignments) {
+            SmartCommunicationAssignmentRepository assignments, ReplyCoachChapterRepository chapters,
+            GuidedPhraseDailyPracticeRepository guidedPractice) {
+        this.chapters = chapters;
+        this.guidedPractice = guidedPractice;
         this.users = users;
         this.students = students;
         this.classes = classes;
@@ -223,6 +239,12 @@ public class SmartGoalsService {
         List<ReplyCoachAttempt> coach = replyCoach.findAll();
         read.put("reply_coach_attempts", coach.size());
         if (sources.contains("REPLY_COACH")) {
+            // Reply Coach questions an admin explicitly tagged as assessing politeness also count for SMART 3.
+            Set<String> politenessNodes = new java.util.HashSet<>();
+            for (ReplyCoachChapter chapter : chapters.findAll())
+                for (ReplyCoachChapter.StoryNode node : chapter.getNodes() == null ? List.<ReplyCoachChapter.StoryNode>of() : chapter.getNodes())
+                    if (node.isAssessesPoliteness() && node.getId() != null) politenessNodes.add(chapter.getId() + "|" + node.getId());
+            read.put("reply_coach_politeness_tagged_questions", politenessNodes.size());
             Map<String, List<ReplyCoachAttempt>> coachByStudent = groupByEmail(coach, ReplyCoachAttempt::getEmail, cohort);
             for (StudentRow row : cohort.values()) {
                 Map<String, ReplyCoachAttempt> firstAttempt = new LinkedHashMap<>();
@@ -235,35 +257,44 @@ public class SmartGoalsService {
                     if (seen == null || earlierCoach(a, seen)) firstAttempt.put(a.getChapterId(), a);
                 }
                 Tally tally = row.goals.get("SMART2");
+                Tally polite = row.goals.get("SMART3");
                 for (ReplyCoachAttempt a : firstAttempt.values()) {
                     Set<String> nodes = new java.util.HashSet<>();
-                    int right = 0, scored = 0;
+                    int right = 0, scored = 0, politeRight = 0, politeScored = 0;
                     Instant last = null;
                     for (ReplyCoachAttempt.AnswerRecord ans : a.getAnswers() == null ? List.<ReplyCoachAttempt.AnswerRecord>of() : a.getAnswers()) {
                         if (ans.getNodeId() == null || ans.getEvaluation() == null || ans.getEvaluation().isBlank()) continue;
                         if (!nodes.add(ans.getNodeId())) { excluded.merge("reply coach: repeated answers to the same node", 1, Integer::sum); continue; }
                         scored++;
-                        if (isGood(ans.getEvaluation())) right++;
+                        boolean good = isGood(ans.getEvaluation());
+                        if (good) right++;
+                        if (politenessNodes.contains(a.getChapterId() + "|" + ans.getNodeId())) {
+                            politeScored++;
+                            if (good) politeRight++;
+                        }
                         if (ans.getAnsweredAt() != null && (last == null || ans.getAnsweredAt().isAfter(last))) last = ans.getAnsweredAt();
                     }
                     if (scored == 0) { tally.incomplete = true; continue; }
-                    tally.add(right, scored, last == null ? a.getStartedAt() : last);
+                    Instant at = last == null ? a.getStartedAt() : last;
+                    tally.add(right, scored, at);
+                    if (politeScored > 0) polite.add(politeRight, politeScored, at);
                 }
             }
         }
 
-        // ---- SMART 2: Response Rush (run level)
+        // ---- SMART 2: Response Rush and Dialogue Relay (run level)
         List<Score> allScores = scores.findAll();
         read.put("scores", allScores.size());
         Map<String, List<Score>> scoresByStudent = groupByEmail(allScores, Score::getEmail, cohort);
-        if (sources.contains("RESPONSE_RUSH")) {
-            Map<String, ResponseRushProgress> openRush = rushProgress.findAll().stream()
-                    .filter(p -> p.getEmail() != null)
-                    .collect(Collectors.toMap(p -> p.getEmail().trim().toLowerCase(Locale.ROOT), p -> p, (a, b) -> a));
+        Map<String, ResponseRushProgress> openRush = !sources.contains("RESPONSE_RUSH") ? Map.of() : rushProgress.findAll().stream()
+                .filter(p -> p.getEmail() != null)
+                .collect(Collectors.toMap(p -> p.getEmail().trim().toLowerCase(Locale.ROOT), p -> p, (a, b) -> a));
+        for (String[] game : new String[][] { { "RESPONSE_RUSH", "QUACKRESPONSE_RUSH", "response rush" }, { "DIALOGUE_RELAY", "QUACKRESPONSE_RELAY", "dialogue relay" } }) {
+            if (!sources.contains(game[0])) continue;
             for (StudentRow row : cohort.values()) {
                 Score first = null;
                 for (Score s : scoresByStudent.getOrDefault(row.email, List.of())) {
-                    if (!"QUACKRESPONSE_RUSH".equalsIgnoreCase(s.getGame())) continue;
+                    if (!game[1].equalsIgnoreCase(s.getGame())) continue;
                     Instant at = scoreTime(s);
                     if (!inPeriod(at, from, to)) continue;
                     row.runsAttempted++;
@@ -271,19 +302,19 @@ public class SmartGoalsService {
                     if (!s.isCompleted()) continue;
                     row.runsCompleted++;
                     if (s.getTotalQuestions() <= 0 || s.getCorrectAnswers() > s.getTotalQuestions()) {
-                        excluded.merge("response rush: invalid correct/total", 1, Integer::sum);
+                        excluded.merge(game[2] + ": invalid correct/total", 1, Integer::sum);
                         continue;
                     }
                     if (first == null || before(at, scoreTime(first))) {
-                        if (first != null) excluded.merge("response rush: repeat runs after the first", 1, Integer::sum);
+                        if (first != null) excluded.merge(game[2] + ": repeat runs after the first", 1, Integer::sum);
                         first = s;
                     } else {
-                        excluded.merge("response rush: repeat runs after the first", 1, Integer::sum);
+                        excluded.merge(game[2] + ": repeat runs after the first", 1, Integer::sum);
                     }
                 }
                 Tally tally = row.goals.get("SMART2");
                 if (first != null) tally.add(first.getCorrectAnswers(), first.getTotalQuestions(), scoreTime(first));
-                else {
+                else if (game[0].equals("RESPONSE_RUSH")) {
                     ResponseRushProgress open = openRush.get(row.email);
                     if (open != null && !open.isCompleted() && open.getAnswers() != null && !open.getAnswers().isEmpty()
                             && inPeriod(open.getUpdatedAt(), from, to)) tally.incomplete = true;
@@ -291,9 +322,43 @@ public class SmartGoalsService {
             }
         }
 
-        // ---- SMART 4: assigned communication activities
-        List<QuackTalkSession> talks = sources.contains("QUACKTALK") ? quackTalk.findAll() : List.of();
+        // ---- SMART 2: Talk with Sumi (per learner turn, context score only)
+        boolean needTalk = sources.contains("TALK_WITH_SUMI") || sources.contains("QUACKTALK");
+        List<QuackTalkSession> talks = needTalk ? quackTalk.findAll() : List.of();
+        read.put("quack_talk_sessions", talks.size());
         Map<String, List<QuackTalkSession>> talksByStudent = groupByEmail(talks, QuackTalkSession::getEmail, cohort);
+        if (sources.contains("TALK_WITH_SUMI")) {
+            for (StudentRow row : cohort.values()) {
+                QuackTalkSession first = null;
+                for (QuackTalkSession t : talksByStudent.getOrDefault(row.email, List.of())) {
+                    if (!"TALK_WITH_SUMI".equalsIgnoreCase(t.getRoomType()) || !inPeriod(t.getPracticedAt(), from, to)) continue;
+                    row.runsAttempted++;
+                    addDay(row.dates, t.getPracticedAt());
+                    if (t.isCompleted()) row.runsCompleted++;
+                    if (t.getContextEvaluations() == null || t.getContextEvaluations().isEmpty()) {
+                        excluded.merge("talk with sumi: sessions without per-turn context scores (saved before tracking)", 1, Integer::sum);
+                        continue;
+                    }
+                    if (first == null || before(t.getPracticedAt(), first.getPracticedAt())) {
+                        if (first != null) excluded.merge("talk with sumi: repeat sessions after the first", 1, Integer::sum);
+                        first = t;
+                    } else excluded.merge("talk with sumi: repeat sessions after the first", 1, Integer::sum);
+                }
+                if (first == null) continue;
+                int right = 0, scored = 0;
+                for (Map<String, Object> turn : first.getContextEvaluations()) {
+                    Object score = turn.get("contextScore");
+                    if (!(score instanceof Number n)) continue;
+                    scored++;
+                    if (Boolean.TRUE.equals(turn.get("japaneseAttempted")) && n.intValue() >= SUMI_CONTEXT_PASS) right++;
+                }
+                if (scored > 0) row.goals.get("SMART2").add(right, scored, first.getPracticedAt());
+            }
+        }
+
+        // ---- SMART 4: assigned communication activities
+        List<GuidedPhraseDailyPractice> guided = sources.contains("GUIDED_PHRASE") ? guidedPractice.findAll() : List.of();
+        Map<String, List<GuidedPhraseDailyPractice>> guidedByStudent = groupByEmail(guided, GuidedPhraseDailyPractice::getEmail, cohort);
         Map<String, List<SituationalAttempt>> sitAll = sitByStudent;
         Map<String, List<ReplyCoachAttempt>> coachAll = groupByEmail(coach, ReplyCoachAttempt::getEmail, cohort);
         Instant now = Instant.now();
@@ -311,7 +376,7 @@ public class SmartGoalsService {
             for (StudentRow row : cohort.values()) {
                 if (!a.getClassCode().equals(row.classCode)) continue;
                 assignedHere++;
-                Instant doneAt = completedAt(a, row.email, sitAll, coachAll, scoresByStudent, talksByStudent);
+                Instant doneAt = completedAt(a, row.email, sitAll, coachAll, scoresByStudent, talksByStudent, guidedByStudent);
                 boolean closed = !a.getDueAt().isAfter(now);
                 if (closed) {
                     row.assigned++;
@@ -338,16 +403,18 @@ public class SmartGoalsService {
         int eligible = cohort.size();
         List<Map<String, Object>> goals = new ArrayList<>();
         goals.add(goal("SMART1", "Situational Communication Accuracy", 80, cohort, "SMART1",
-                "Game records: QuackSituate Situational Recognition and Expression Match runs",
-                List.of("Recognition runs that end in game over are not saved by the app, so only finished runs are measured; this can overstate accuracy.",
+                "Game records: QuackSituate Ahiru Rescue and Expression Match runs",
+                List.of("Ahiru Rescue runs that end in game over are not saved by the app, so only finished runs are measured; this can overstate accuracy.",
                         "Per-question answers are not stored for QuackSituate; each run's saved correct/total is used.")));
         goals.add(goal("SMART2", "Conversational Response Accuracy", 75, cohort, "SMART2",
-                "Game records: QuackResponse Reply Coach (per answer) and Response Rush (per run)",
-                List.of("QuackTalk and Guided Phrase store AI ratings or session counts, not correct/incorrect answers, so they are not included.",
-                        "Dialogue Relay saves a fixed total of 30 that mixes dialogue and speaking bonus items, so it is left out until it is stored per item.")));
+                "Game records: Reply Coach (per answer), Response Rush and Dialogue Relay (per run), Talk with Sumi (per turn, context score)",
+                List.of("Talk with Sumi counts only sessions saved after per-turn context scores started being recorded; earlier sessions kept only an average and are not measurable.",
+                        "A Sumi turn counts as correct at a context score of " + SUMI_CONTEXT_PASS + "/100 or more with Japanese attempted. This pass mark is a design choice of the evaluation, not a score the app shows students.",
+                        "Guided Phrase Practice and all pronunciation, fluency, accuracy and completeness scores are not used for response accuracy.")));
         goals.add(goal("SMART3", "Japanese Politeness Recognition Accuracy", 75, cohort, "SMART3",
-                "Game records: QuackSituate Politeness (formal vs informal) runs",
-                List.of("Only the Politeness game explicitly assesses politeness. Expression Match level 3 (formal communication) and Reply Coach IMPOLITE/RUDE ratings are related but not counted here.")));
+                "Game records: QuackSituate Politeness runs and Reply Coach questions tagged as politeness",
+                List.of("Reply Coach questions count only after an admin tags them as politeness in the Reply Coach editor; untagged questions are not assumed to measure politeness.",
+                        "Expression Match and Response Rush save only run totals, not per-question answers, so politeness items inside them cannot be separated and are not counted.")));
 
         Map<String, Object> g4 = new LinkedHashMap<>();
         g4.put("key", "SMART4");
@@ -451,7 +518,8 @@ public class SmartGoalsService {
     /** When (if at all) the student completed this assignment inside its window. */
     private Instant completedAt(SmartCommunicationAssignment a, String email,
             Map<String, List<SituationalAttempt>> sit, Map<String, List<ReplyCoachAttempt>> coach,
-            Map<String, List<Score>> scoreMap, Map<String, List<QuackTalkSession>> talks) {
+            Map<String, List<Score>> scoreMap, Map<String, List<QuackTalkSession>> talks,
+            Map<String, List<GuidedPhraseDailyPractice>> guided) {
         Instant start = a.getStartsAt(), due = a.getDueAt();
         String key = upper(a.getActivityKey());
         Instant best = null;
@@ -474,9 +542,21 @@ public class SmartGoalsService {
                     if (s.isCompleted() && game.equalsIgnoreCase(s.getGame()) && within(scoreTime(s), start, due))
                         best = earliest(best, scoreTime(s));
             }
-            case "QUACKTALK" -> {
+            case "QUACKTALK", "TALK_WITH_SUMI" -> {
                 for (QuackTalkSession t : talks.getOrDefault(email, List.of()))
-                    if (t.isCompleted() && within(t.getPracticedAt(), start, due)) best = earliest(best, t.getPracticedAt());
+                    if (t.isCompleted() && (key.equals("QUACKTALK") || "TALK_WITH_SUMI".equalsIgnoreCase(t.getRoomType()))
+                            && within(t.getPracticedAt(), start, due)) best = earliest(best, t.getPracticedAt());
+            }
+            case "GUIDED_PHRASE" -> {
+                // Guided Phrase keeps one record per learner per day with a completed-session count.
+                LocalDate first = start.atZone(ZONE).toLocalDate(), last = due.atZone(ZONE).toLocalDate();
+                for (GuidedPhraseDailyPractice g : guided.getOrDefault(email, List.of())) {
+                    if (g.getSessionsCompleted() <= 0 || g.getPracticeDate() == null) continue;
+                    LocalDate day;
+                    try { day = LocalDate.parse(g.getPracticeDate()); } catch (Exception e) { continue; }
+                    if (day.isBefore(first) || day.isAfter(last)) continue;
+                    best = earliest(best, g.getUpdatedAt() != null ? g.getUpdatedAt() : day.atStartOfDay(ZONE).toInstant());
+                }
             }
             default -> { }
         }
