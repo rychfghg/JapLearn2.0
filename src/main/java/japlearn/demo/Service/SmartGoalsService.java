@@ -27,7 +27,6 @@ import japlearn.demo.Entity.ReplyCoachAttempt;
 import japlearn.demo.Entity.ResponseRushProgress;
 import japlearn.demo.Entity.Score;
 import japlearn.demo.Entity.SituationalAttempt;
-import japlearn.demo.Entity.SmartCommunicationAssignment;
 import japlearn.demo.Entity.Student;
 import japlearn.demo.Entity.User;
 import japlearn.demo.Entity.GuidedPhraseDailyPractice;
@@ -40,7 +39,6 @@ import japlearn.demo.Repository.ReplyCoachAttemptRepository;
 import japlearn.demo.Repository.ResponseRushProgressRepository;
 import japlearn.demo.Repository.ScoreRepository;
 import japlearn.demo.Repository.SituationalAttemptRepository;
-import japlearn.demo.Repository.SmartCommunicationAssignmentRepository;
 import japlearn.demo.Repository.StudentRepository;
 import japlearn.demo.Repository.UserRepository;
 
@@ -66,14 +64,14 @@ public class SmartGoalsService {
             "RESPONSE_RUSH", "SMART2",
             "DIALOGUE_RELAY", "SMART2",
             "TALK_WITH_SUMI", "SMART2");
-    /** Activities a class can be assigned for objective 4. QUACKTALK = any QuackTalk session (older assignments). */
-    public static final Set<String> ASSIGNABLE = Set.of(
-            "RECOGNITION", "EXPRESSION_MATCH", "POLITENESS", "REPLY_COACH", "RESPONSE_RUSH", "DIALOGUE_RELAY",
-            "TALK_WITH_SUMI", "GUIDED_PHRASE", "QUACKTALK");
+    /** The 8 communication activities every eligible student is expected to complete (SMART 4). */
+    public static final List<String> COMPLETION_ACTIVITIES = List.of("RECOGNITION", "EXPRESSION_MATCH", "POLITENESS",
+            "REPLY_COACH", "RESPONSE_RUSH", "DIALOGUE_RELAY", "TALK_WITH_SUMI", "GUIDED_PHRASE");
+    private static final Set<String> ALL_SOURCES = Set.copyOf(COMPLETION_ACTIVITIES);
     private static final Map<String, Set<String>> MODULES = Map.of(
             "QUACKSITUATE", Set.of("RECOGNITION", "EXPRESSION_MATCH", "POLITENESS"),
             "QUACKRESPONSE", Set.of("REPLY_COACH", "RESPONSE_RUSH", "DIALOGUE_RELAY"),
-            "QUACKTALK", Set.of("TALK_WITH_SUMI", "GUIDED_PHRASE", "QUACKTALK"));
+            "QUACKTALK", Set.of("TALK_WITH_SUMI", "GUIDED_PHRASE"));
 
     public static final List<String> RULES = List.of(
             "Accuracy = correct scored answers / total scored answers x 100, summed across eligible students (not an average of student percentages).",
@@ -84,8 +82,8 @@ public class SmartGoalsService {
             "Talk with Sumi: each learner turn is one scored response; it is correct when Japanese was attempted and the context score is at least " + SUMI_CONTEXT_PASS + "/100. Pronunciation, accuracy, fluency and completeness scores are never used. Sessions saved before per-turn context scores were recorded are not measurable.",
             "SMART 3 uses QuackSituate Politeness plus Reply Coach questions an admin has explicitly tagged as politeness. Expression Match and Response Rush do not store per-question answers, so their items cannot be tagged and are not counted.",
             "Students without records are 'No participation' and students with only unfinished runs are 'Incomplete'; neither is counted as zero.",
-            "Completion = completed assigned activities / assigned activities. Only assignments created on this dashboard count, each once per student, and only after their due date. Voluntary play is never counted as an assignment.",
-            "An assignment is completed only from finished game records inside its window (QuackSituate runs marked completed, Reply Coach chapters marked COMPLETED, finished Response Rush and Dialogue Relay runs, Talk with Sumi sessions with at least one learner turn, completed Guided Phrase sessions). Started or in-progress records never count. When an assignment requires several levels, chapters, runs or sessions, each distinct one counts once and all must be finished.",
+            "Completion = activities completed / (8 communication activities x eligible students) x 100: Ahiru Rescue, Expression Match, Politeness, Reply Coach, Response Rush, Dialogue Relay, Talk with Sumi and Guided Phrase Practice. Each activity counts once per student when finished at least once in the period.",
+            "An activity is completed only from finished game progress records (QuackSituate runs marked completed, Reply Coach chapters marked COMPLETED, finished Response Rush and Dialogue Relay runs, Talk with Sumi sessions with at least one learner turn, completed Guided Phrase sessions). Started-but-unfinished activities count as not completed. Questionnaire answers are never used.",
             "A goal shows 'Insufficient Data' when its denominator is 0.");
 
     private final UserRepository users;
@@ -96,14 +94,13 @@ public class SmartGoalsService {
     private final ScoreRepository scores;
     private final ResponseRushProgressRepository rushProgress;
     private final QuackTalkSessionRepository quackTalk;
-    private final SmartCommunicationAssignmentRepository assignments;
     private final ReplyCoachChapterRepository chapters;
     private final GuidedPhraseDailyPracticeRepository guidedPractice;
 
     public SmartGoalsService(UserRepository users, StudentRepository students, ClassesRepository classes,
             SituationalAttemptRepository situational, ReplyCoachAttemptRepository replyCoach, ScoreRepository scores,
             ResponseRushProgressRepository rushProgress, QuackTalkSessionRepository quackTalk,
-            SmartCommunicationAssignmentRepository assignments, ReplyCoachChapterRepository chapters,
+            ReplyCoachChapterRepository chapters,
             GuidedPhraseDailyPracticeRepository guidedPractice) {
         this.chapters = chapters;
         this.guidedPractice = guidedPractice;
@@ -115,7 +112,6 @@ public class SmartGoalsService {
         this.scores = scores;
         this.rushProgress = rushProgress;
         this.quackTalk = quackTalk;
-        this.assignments = assignments;
     }
 
     /** onlyStudentIds: when not null, the cohort is limited to these accounts (e.g. survey respondents matched by email). */
@@ -163,8 +159,8 @@ public class SmartGoalsService {
         final Map<String, Tally> goals = new LinkedHashMap<>();
         int runsAttempted;
         int runsCompleted;
-        int assigned;
-        int assignedCompleted;
+        int activitiesCompleted;
+        final List<Map<String, Object>> activityStatus = new ArrayList<>();
         final Set<String> dates = new TreeSet<>();
 
         StudentRow(User user, String classCode) {
@@ -331,7 +327,7 @@ public class SmartGoalsService {
         }
 
         // ---- SMART 2: Talk with Sumi (per learner turn, context score only)
-        boolean needTalk = sources.contains("TALK_WITH_SUMI") || sources.contains("QUACKTALK");
+        boolean needTalk = sources.contains("TALK_WITH_SUMI");
         List<QuackTalkSession> talks = needTalk ? quackTalk.findAll() : List.of();
         read.put("quack_talk_sessions", talks.size());
         Map<String, List<QuackTalkSession>> talksByStudent = groupByEmail(talks, QuackTalkSession::getEmail, cohort);
@@ -364,48 +360,39 @@ public class SmartGoalsService {
             }
         }
 
-        // ---- SMART 4: assigned communication activities
+        // ---- SMART 4: completion of the 8 communication activities (no assignments)
         List<GuidedPhraseDailyPractice> guided = sources.contains("GUIDED_PHRASE") ? guidedPractice.findAll() : List.of();
+        read.put("guided_phrase_daily_practices", guided.size());
         Map<String, List<GuidedPhraseDailyPractice>> guidedByStudent = groupByEmail(guided, GuidedPhraseDailyPractice::getEmail, cohort);
-        Map<String, List<SituationalAttempt>> sitAll = sitByStudent;
         Map<String, List<ReplyCoachAttempt>> coachAll = groupByEmail(coach, ReplyCoachAttempt::getEmail, cohort);
-        Instant now = Instant.now();
-        Set<String> cohortClasses = cohort.values().stream().map(r -> r.classCode).filter(Objects::nonNull).collect(Collectors.toSet());
-        List<Map<String, Object>> counted = new ArrayList<>();
-        List<Map<String, Object>> open = new ArrayList<>();
-        int assignedTotal = 0, completedTotal = 0;
+        List<String> activities = COMPLETION_ACTIVITIES.stream().filter(sources::contains).toList();
+        int completedTotal = 0, startedTotal = 0;
         Instant lastCompletion = null;
-        Set<String> assignedStudents = new java.util.HashSet<>();
-        for (SmartCommunicationAssignment a : assignments.findAllByOrderByDueAtDesc()) {
-            if (a.getClassCode() == null || !cohortClasses.contains(a.getClassCode()) || !sources.contains(upper(a.getActivityKey()))) continue;
-            if (a.getDueAt() == null || a.getStartsAt() == null) continue;
-            if ((from != null && a.getDueAt().isBefore(from)) || (to != null && !a.getDueAt().isBefore(to))) continue;
-            int assignedHere = 0, doneHere = 0;
-            for (StudentRow row : cohort.values()) {
-                if (!a.getClassCode().equals(row.classCode)) continue;
-                assignedHere++;
-                Instant doneAt = completedAt(a, row.email, sitAll, coachAll, scoresByStudent, talksByStudent, guidedByStudent);
-                boolean closed = !a.getDueAt().isAfter(now);
-                if (closed) {
-                    row.assigned++;
-                    assignedStudents.add(row.email);
-                    if (doneAt != null) {
-                        row.assignedCompleted++;
-                        if (lastCompletion == null || doneAt.isAfter(lastCompletion)) lastCompletion = doneAt;
-                    }
-                }
-                if (doneAt != null) doneHere++;
+        int studentsWithAnyRecord = 0;
+        for (StudentRow row : cohort.values()) {
+            boolean any = false;
+            for (String key : activities) {
+                Instant done = completedAt(key, row.email, from, to, sitByStudent, coachAll, scoresByStudent, talksByStudent, guidedByStudent);
+                String status;
+                if (done != null) {
+                    status = "COMPLETED";
+                    row.activitiesCompleted++;
+                    completedTotal++;
+                    if (lastCompletion == null || done.isAfter(lastCompletion)) lastCompletion = done;
+                } else if (started(key, row.email, from, to, sitByStudent, coachAll, scoresByStudent, talksByStudent, guidedByStudent, openRush)) {
+                    status = "STARTED";
+                    startedTotal++;
+                } else status = "NOT_STARTED";
+                if (!status.equals("NOT_STARTED")) any = true;
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("key", key);
+                item.put("status", status);
+                item.put("completedAt", done);
+                row.activityStatus.add(item);
             }
-            Map<String, Object> view = assignmentView(a, classTitles);
-            view.put("assignedStudents", assignedHere);
-            view.put("completedStudents", doneHere);
-            if (a.getDueAt().isAfter(now)) open.add(view);
-            else {
-                counted.add(view);
-                assignedTotal += assignedHere;
-                completedTotal += doneHere;
-            }
+            if (any) studentsWithAnyRecord++;
         }
+        int expected = activities.size() * cohort.size();
 
         // ---- cohort totals
         int eligible = cohort.size();
@@ -429,19 +416,20 @@ public class SmartGoalsService {
         g4.put("name", "Communication Activity Completion Rate");
         g4.put("target", 80);
         g4.put("correct", completedTotal);
-        g4.put("total", assignedTotal);
-        g4.put("percentage", assignedTotal > 0 ? round(completedTotal * 100.0 / assignedTotal) : null);
-        g4.put("status", assignedTotal == 0 ? "INSUFFICIENT_DATA" : completedTotal * 100.0 / assignedTotal >= 80 ? "ACHIEVED" : "NOT_ACHIEVED");
+        g4.put("total", expected);
+        g4.put("percentage", expected > 0 ? round(completedTotal * 100.0 / expected) : null);
+        g4.put("status", expected == 0 || studentsWithAnyRecord == 0 ? "INSUFFICIENT_DATA" : completedTotal * 100.0 / expected >= 80 ? "ACHIEVED" : "NOT_ACHIEVED");
         g4.put("eligibleStudents", eligible);
-        g4.put("participatingStudents", assignedStudents.size());
-        g4.put("noParticipation", null);
-        g4.put("incomplete", null);
+        g4.put("participatingStudents", studentsWithAnyRecord);
+        g4.put("noParticipation", eligible - studentsWithAnyRecord);
+        g4.put("incomplete", startedTotal);
+        g4.put("activities", activities);
         g4.put("lastUpdated", lastCompletion);
-        g4.put("evidence", "Assignments created on this dashboard; completion read from existing game records inside each assignment window");
+        g4.put("evidence", "Game progress records for " + activities.size() + " communication activities per eligible student (" + activities.size() + " x " + eligible + " = " + expected + ")");
         g4.put("limitations", List.of(
-                "The system had no class assignment records for communication games before this dashboard. Historical completion is Not Measurable; only assignments created here (new records, dated) are counted.",
-                "Students are assigned by their current class. A student who changed class is counted in the new class.",
-                "Open assignments (due date not reached) are listed but not counted yet."));
+                "Every eligible student is expected to complete each of the " + activities.size() + " activities once in the selected period; an activity a student never opened counts as not completed.",
+                "'Incomplete' here is the number of activities that were started but not finished; they are counted as not completed.",
+                "Completion is read only from game progress records, never from questionnaire answers."));
         goals.add(g4);
 
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -454,10 +442,11 @@ public class SmartGoalsService {
             r.put("classTitle", row.classCode == null ? null : classTitles.get(row.classCode));
             for (Map.Entry<String, Tally> e : row.goals.entrySet()) r.put(e.getKey(), e.getValue().toMap());
             Map<String, Object> s4 = new LinkedHashMap<>();
-            s4.put("correct", row.assignedCompleted);
-            s4.put("total", row.assigned);
-            s4.put("percentage", row.assigned > 0 ? round(row.assignedCompleted * 100.0 / row.assigned) : null);
-            s4.put("status", row.assigned > 0 ? "MEASURED" : "NOT_ASSIGNED");
+            s4.put("correct", row.activitiesCompleted);
+            s4.put("total", activities.size());
+            s4.put("percentage", activities.isEmpty() ? null : round(row.activitiesCompleted * 100.0 / activities.size()));
+            s4.put("status", activities.isEmpty() ? "NO_PARTICIPATION" : "MEASURED");
+            s4.put("activities", row.activityStatus);
             r.put("SMART4", s4);
             r.put("runsAttempted", row.runsAttempted);
             r.put("runsCompleted", row.runsCompleted);
@@ -488,7 +477,6 @@ public class SmartGoalsService {
                 .map(e -> { Map<String, Object> c = new LinkedHashMap<>(); c.put("classCode", e.getKey()); c.put("classTitle", e.getValue()); return c; })
                 .toList());
         out.put("studentOptions", studentOptions);
-        out.put("assignments", Map.of("counted", counted, "open", open));
         out.put("audit", Map.of("recordsRead", read, "recordsExcluded", excluded));
         return out;
     }
@@ -525,88 +513,85 @@ public class SmartGoalsService {
     }
 
     /**
-     * When (if at all) the student met this assignment's completion requirement inside its window.
-     * Only finished records count; started or in-progress records never do. Each distinct unit (a level/set,
-     * a chapter, a run, a session, a practice session) counts once, and the assignment is complete when the
-     * student has finished the required number of units. Returns the time the last required unit was finished.
+     * When the student first finished this activity inside the period, or null. Only finished records count:
+     * QuackSituate runs marked completed, Reply Coach chapters marked COMPLETED, finished Response Rush and
+     * Dialogue Relay runs, Talk with Sumi sessions with at least one learner turn, completed Guided Phrase sessions.
      */
-    private Instant completedAt(SmartCommunicationAssignment a, String email,
+    private Instant completedAt(String key, String email, Instant from, Instant to,
             Map<String, List<SituationalAttempt>> sit, Map<String, List<ReplyCoachAttempt>> coach,
             Map<String, List<Score>> scoreMap, Map<String, List<QuackTalkSession>> talks,
             Map<String, List<GuidedPhraseDailyPractice>> guided) {
-        Instant start = a.getStartsAt(), due = a.getDueAt();
-        String key = upper(a.getActivityKey());
-        Map<String, Instant> units = new java.util.HashMap<>();
-        java.util.function.BiConsumer<String, Instant> unit = (id, at) -> units.merge(id, at, (x, y) -> y.isBefore(x) ? y : x);
+        Instant best = null;
         switch (key) {
             case "RECOGNITION", "EXPRESSION_MATCH", "POLITENESS" -> {
                 for (SituationalAttempt s : sit.getOrDefault(email, List.of()))
-                    if (s.isCompleted() && key.equals(upper(s.getGameType()))
-                            && (a.getLevel() == null || a.getLevel() == s.getLevel())
-                            && within(s.getCompletedAt(), start, due)) unit.accept(s.getLevel() + "|" + s.getSetNumber(), s.getCompletedAt());
+                    if (s.isCompleted() && key.equals(upper(s.getGameType())) && s.getCompletedAt() != null && inPeriod(s.getCompletedAt(), from, to))
+                        best = earliest(best, s.getCompletedAt());
             }
             case "REPLY_COACH" -> {
                 for (ReplyCoachAttempt r : coach.getOrDefault(email, List.of()))
-                    if ("COMPLETED".equalsIgnoreCase(r.getStatus()) && r.getChapterId() != null
-                            && (a.getChapterId() == null || a.getChapterId().equals(r.getChapterId()))
-                            && within(r.getCompletedAt(), start, due)) unit.accept(r.getChapterId(), r.getCompletedAt());
+                    if ("COMPLETED".equalsIgnoreCase(r.getStatus()) && r.getCompletedAt() != null && inPeriod(r.getCompletedAt(), from, to))
+                        best = earliest(best, r.getCompletedAt());
             }
             case "RESPONSE_RUSH", "DIALOGUE_RELAY" -> {
                 String game = key.equals("RESPONSE_RUSH") ? "QUACKRESPONSE_RUSH" : "QUACKRESPONSE_RELAY";
                 for (Score s : scoreMap.getOrDefault(email, List.of())) {
                     Instant at = scoreTime(s);
-                    if (s.isCompleted() && game.equalsIgnoreCase(s.getGame()) && within(at, start, due))
-                        unit.accept(s.getId() != null ? s.getId() : String.valueOf(at), at);
+                    if (s.isCompleted() && game.equalsIgnoreCase(s.getGame()) && at != null && inPeriod(at, from, to)) best = earliest(best, at);
                 }
             }
-            case "QUACKTALK", "TALK_WITH_SUMI" -> {
-                // A session with no learner turns was opened but not actually done.
+            case "TALK_WITH_SUMI" -> {
                 for (QuackTalkSession t : talks.getOrDefault(email, List.of()))
-                    if (t.isCompleted() && t.getConversationTurns() > 0
-                            && (key.equals("QUACKTALK") || "TALK_WITH_SUMI".equalsIgnoreCase(t.getRoomType()))
-                            && within(t.getPracticedAt(), start, due)) unit.accept(t.getId() != null ? t.getId() : String.valueOf(t.getPracticedAt()), t.getPracticedAt());
+                    if (t.isCompleted() && t.getConversationTurns() > 0 && "TALK_WITH_SUMI".equalsIgnoreCase(t.getRoomType())
+                            && t.getPracticedAt() != null && inPeriod(t.getPracticedAt(), from, to)) best = earliest(best, t.getPracticedAt());
             }
             case "GUIDED_PHRASE" -> {
-                // One record per learner per day: each completed (not merely started) session is a unit.
-                LocalDate first = start.atZone(ZONE).toLocalDate(), last = due.atZone(ZONE).toLocalDate();
                 for (GuidedPhraseDailyPractice g : guided.getOrDefault(email, List.of())) {
-                    if (g.getSessionsCompleted() <= 0 || g.getPracticeDate() == null) continue;
-                    LocalDate day;
-                    try { day = LocalDate.parse(g.getPracticeDate()); } catch (Exception e) { continue; }
-                    if (day.isBefore(first) || day.isAfter(last)) continue;
-                    Instant at = g.getUpdatedAt() != null ? g.getUpdatedAt() : day.atStartOfDay(ZONE).toInstant();
-                    for (int i = 0; i < g.getSessionsCompleted(); i++) unit.accept(day + "#" + i, at);
+                    Instant at = guidedDay(g);
+                    if (g.getSessionsCompleted() > 0 && at != null && inPeriod(at, from, to))
+                        best = earliest(best, g.getUpdatedAt() != null ? g.getUpdatedAt() : at);
                 }
             }
             default -> { }
         }
-        int required = Math.max(1, a.getRequiredCount() == null ? 1 : a.getRequiredCount());
-        if (units.size() < required) return null;
-        return units.values().stream().sorted().skip(required - 1).findFirst().orElse(null);
+        return best;
     }
 
-    public static Map<String, Object> assignmentView(SmartCommunicationAssignment a, Map<String, String> classTitles) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", a.getId());
-        m.put("title", a.getTitle());
-        m.put("classCode", a.getClassCode());
-        m.put("classTitle", classTitles == null ? null : classTitles.get(a.getClassCode()));
-        m.put("activityKey", a.getActivityKey());
-        m.put("level", a.getLevel());
-        m.put("chapterId", a.getChapterId());
-        m.put("requiredCount", a.getRequiredCount() == null ? 1 : a.getRequiredCount());
-        m.put("startsAt", a.getStartsAt());
-        m.put("dueAt", a.getDueAt());
-        m.put("createdAt", a.getCreatedAt());
-        return m;
+    /** Whether the student opened the activity in the period (any record), even without finishing it. */
+    private boolean started(String key, String email, Instant from, Instant to,
+            Map<String, List<SituationalAttempt>> sit, Map<String, List<ReplyCoachAttempt>> coach,
+            Map<String, List<Score>> scoreMap, Map<String, List<QuackTalkSession>> talks,
+            Map<String, List<GuidedPhraseDailyPractice>> guided, Map<String, ResponseRushProgress> openRush) {
+        return switch (key) {
+            case "RECOGNITION", "EXPRESSION_MATCH", "POLITENESS" -> sit.getOrDefault(email, List.of()).stream()
+                    .anyMatch(s -> key.equals(upper(s.getGameType())) && inPeriod(s.getCompletedAt(), from, to));
+            case "REPLY_COACH" -> coach.getOrDefault(email, List.of()).stream().anyMatch(r -> inPeriod(r.getStartedAt(), from, to));
+            case "RESPONSE_RUSH" -> {
+                ResponseRushProgress p = openRush.get(email);
+                yield (p != null && p.getAnswers() != null && !p.getAnswers().isEmpty() && inPeriod(p.getUpdatedAt(), from, to))
+                        || scoreMap.getOrDefault(email, List.of()).stream().anyMatch(s -> "QUACKRESPONSE_RUSH".equalsIgnoreCase(s.getGame()) && inPeriod(scoreTime(s), from, to));
+            }
+            case "DIALOGUE_RELAY" -> scoreMap.getOrDefault(email, List.of()).stream()
+                    .anyMatch(s -> "QUACKRESPONSE_RELAY".equalsIgnoreCase(s.getGame()) && inPeriod(scoreTime(s), from, to));
+            case "TALK_WITH_SUMI" -> talks.getOrDefault(email, List.of()).stream()
+                    .anyMatch(t -> "TALK_WITH_SUMI".equalsIgnoreCase(t.getRoomType()) && inPeriod(t.getPracticedAt(), from, to));
+            case "GUIDED_PHRASE" -> guided.getOrDefault(email, List.of()).stream()
+                    .anyMatch(g -> g.getSessionsStarted() > 0 && inPeriod(guidedDay(g), from, to));
+            default -> false;
+        };
+    }
+
+    private static Instant guidedDay(GuidedPhraseDailyPractice g) {
+        if (g.getPracticeDate() == null) return null;
+        try { return LocalDate.parse(g.getPracticeDate()).atStartOfDay(ZONE).toInstant(); } catch (Exception e) { return null; }
     }
 
     private static Set<String> sourcesFor(String module) {
         String m = module == null ? "" : module.trim().toUpperCase(Locale.ROOT);
-        if (m.isEmpty() || m.equals("ALL")) return ASSIGNABLE;
+        if (m.isEmpty() || m.equals("ALL")) return ALL_SOURCES;
         if (MODULES.containsKey(m)) return MODULES.get(m);
-        if (ASSIGNABLE.contains(m)) return Set.of(m);
-        return ASSIGNABLE;
+        if (ALL_SOURCES.contains(m)) return Set.of(m);
+        return ALL_SOURCES;
     }
 
     private static <T> Map<String, List<T>> groupByEmail(List<T> items, Function<T, String> email, Map<String, StudentRow> cohort) {
