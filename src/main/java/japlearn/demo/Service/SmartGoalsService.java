@@ -152,6 +152,42 @@ public class SmartGoalsService {
         }
     }
 
+    /** One specific area (activity, level or chapter) inside an objective, summed over the cohort. */
+    private static final class Area {
+        int correct, total, started;
+        final Set<String> students = new java.util.HashSet<>();
+    }
+
+    private static final Map<String, String> SOURCE_LABEL = Map.of(
+            "RECOGNITION", "Ahiru Rescue", "EXPRESSION_MATCH", "Expression Match", "POLITENESS", "Politeness",
+            "REPLY_COACH", "Reply Coach", "RESPONSE_RUSH", "Response Rush", "DIALOGUE_RELAY", "Dialogue Relay",
+            "TALK_WITH_SUMI", "Talk with Sumi", "GUIDED_PHRASE", "Guided Phrase Practice");
+
+    private static void area(Map<String, Map<String, Area>> areas, String goal, String label, int right, int scored, String email) {
+        Area a = areas.computeIfAbsent(goal, k -> new LinkedHashMap<>()).computeIfAbsent(label, k -> new Area());
+        a.correct += right;
+        a.total += scored;
+        a.students.add(email);
+    }
+
+    private static List<Map<String, Object>> areaList(Map<String, Area> areas) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (areas == null) return out;
+        for (Map.Entry<String, Area> e : areas.entrySet()) {
+            Area a = e.getValue();
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("label", e.getKey());
+            m.put("correct", a.correct);
+            m.put("total", a.total);
+            m.put("percentage", a.total > 0 ? round(a.correct * 100.0 / a.total) : null);
+            m.put("students", a.students.size());
+            m.put("started", a.started);
+            out.add(m);
+        }
+        out.sort(Comparator.comparing(m -> m.get("percentage") == null ? 101.0 : (Double) m.get("percentage")));
+        return out;
+    }
+
     private static final class StudentRow {
         final User user;
         final String classCode;
@@ -176,6 +212,8 @@ public class SmartGoalsService {
         Instant to = f.to() == null ? null : f.to().plusDays(1).atStartOfDay(ZONE).toInstant();
         Set<String> sources = sourcesFor(f.module());
         Map<String, Integer> excluded = new LinkedHashMap<>();
+        Map<String, Map<String, Area>> areas = new LinkedHashMap<>();
+        Map<String, Integer> coachEvaluations = new LinkedHashMap<>();
         Map<String, Integer> read = new LinkedHashMap<>();
 
         // ---- cohort
@@ -235,8 +273,12 @@ public class SmartGoalsService {
                     excluded.merge("situational: repeat runs after the first", 1, Integer::sum);
                 }
             }
-            for (SituationalAttempt a : firstRun.values())
-                row.goals.get(SOURCE_GOAL.get(upper(a.getGameType()))).add(a.getCorrectAnswers(), a.getTotalQuestions(), a.getCompletedAt());
+            for (SituationalAttempt a : firstRun.values()) {
+                String type = upper(a.getGameType());
+                row.goals.get(SOURCE_GOAL.get(type)).add(a.getCorrectAnswers(), a.getTotalQuestions(), a.getCompletedAt());
+                area(areas, SOURCE_GOAL.get(type), SOURCE_LABEL.get(type) + (type.equals("RECOGNITION") || a.getLevel() <= 0 ? "" : " · Level " + a.getLevel()),
+                        a.getCorrectAnswers(), a.getTotalQuestions(), row.email);
+            }
         }
 
         // ---- SMART 2: Reply Coach (item level)
@@ -245,9 +287,12 @@ public class SmartGoalsService {
         if (sources.contains("REPLY_COACH")) {
             // Reply Coach questions an admin explicitly tagged as assessing politeness also count for SMART 3.
             Set<String> politenessNodes = new java.util.HashSet<>();
+            Map<String, String> chapterTitles = new java.util.HashMap<>();
             for (ReplyCoachChapter chapter : chapters.findAll())
                 for (ReplyCoachChapter.StoryNode node : chapter.getNodes() == null ? List.<ReplyCoachChapter.StoryNode>of() : chapter.getNodes())
                     if (node.isAssessesPoliteness() && node.getId() != null) politenessNodes.add(chapter.getId() + "|" + node.getId());
+            for (ReplyCoachChapter chapter : chapters.findAll())
+                if (chapter.getId() != null) chapterTitles.put(chapter.getId(), chapter.getTitle() == null || chapter.getTitle().isBlank() ? chapter.getId() : chapter.getTitle());
             read.put("reply_coach_politeness_tagged_questions", politenessNodes.size());
             Map<String, List<ReplyCoachAttempt>> coachByStudent = groupByEmail(coach, ReplyCoachAttempt::getEmail, cohort);
             for (StudentRow row : cohort.values()) {
@@ -271,6 +316,7 @@ public class SmartGoalsService {
                         if (!nodes.add(ans.getNodeId())) { excluded.merge("reply coach: repeated answers to the same node", 1, Integer::sum); continue; }
                         scored++;
                         boolean good = isGood(ans.getEvaluation());
+                        coachEvaluations.merge(upper(ans.getEvaluation()), 1, Integer::sum);
                         if (good) right++;
                         if (politenessNodes.contains(a.getChapterId() + "|" + ans.getNodeId())) {
                             politeScored++;
@@ -281,7 +327,12 @@ public class SmartGoalsService {
                     if (scored == 0) { tally.incomplete = true; continue; }
                     Instant at = last == null ? a.getStartedAt() : last;
                     tally.add(right, scored, at);
-                    if (politeScored > 0) polite.add(politeRight, politeScored, at);
+                    String chapterName = chapterTitles.getOrDefault(a.getChapterId(), a.getChapterId());
+                    area(areas, "SMART2", "Reply Coach · " + chapterName, right, scored, row.email);
+                    if (politeScored > 0) {
+                        polite.add(politeRight, politeScored, at);
+                        area(areas, "SMART3", "Reply Coach (politeness-tagged) · " + chapterName, politeRight, politeScored, row.email);
+                    }
                 }
             }
         }
@@ -317,7 +368,10 @@ public class SmartGoalsService {
                     }
                 }
                 Tally tally = row.goals.get("SMART2");
-                if (first != null) tally.add(first.getCorrectAnswers(), first.getTotalQuestions(), scoreTime(first));
+                if (first != null) {
+                    tally.add(first.getCorrectAnswers(), first.getTotalQuestions(), scoreTime(first));
+                    area(areas, "SMART2", SOURCE_LABEL.get(game[0]), first.getCorrectAnswers(), first.getTotalQuestions(), row.email);
+                }
                 else if (game[0].equals("RESPONSE_RUSH")) {
                     ResponseRushProgress open = openRush.get(row.email);
                     if (open != null && !open.isCompleted() && open.getAnswers() != null && !open.getAnswers().isEmpty()
@@ -356,7 +410,10 @@ public class SmartGoalsService {
                     scored++;
                     if (Boolean.TRUE.equals(turn.get("japaneseAttempted")) && n.intValue() >= SUMI_CONTEXT_PASS) right++;
                 }
-                if (scored > 0) row.goals.get("SMART2").add(right, scored, first.getPracticedAt());
+                if (scored > 0) {
+                    row.goals.get("SMART2").add(right, scored, first.getPracticedAt());
+                    area(areas, "SMART2", "Talk with Sumi", right, scored, row.email);
+                }
             }
         }
 
@@ -384,6 +441,10 @@ public class SmartGoalsService {
                     startedTotal++;
                 } else status = "NOT_STARTED";
                 if (!status.equals("NOT_STARTED")) any = true;
+                Area act = areas.computeIfAbsent("SMART4", k -> new LinkedHashMap<>()).computeIfAbsent(SOURCE_LABEL.get(key), k -> new Area());
+                act.total++;
+                if (status.equals("COMPLETED")) { act.correct++; act.students.add(row.email); }
+                if (status.equals("STARTED")) act.started++;
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("key", key);
                 item.put("status", status);
@@ -431,6 +492,7 @@ public class SmartGoalsService {
                 "'Incomplete' here is the number of activities that were started but not finished; they are counted as not completed.",
                 "Completion is read only from game progress records, never from questionnaire answers."));
         goals.add(g4);
+        for (Map<String, Object> g : goals) g.put("areas", areaList(areas.get(String.valueOf(g.get("key")))));
 
         List<Map<String, Object>> rows = new ArrayList<>();
         for (StudentRow row : cohort.values()) {
@@ -478,6 +540,7 @@ public class SmartGoalsService {
                 .toList());
         out.put("studentOptions", studentOptions);
         out.put("audit", Map.of("recordsRead", read, "recordsExcluded", excluded));
+        out.put("replyCoachEvaluations", coachEvaluations);
         return out;
     }
 

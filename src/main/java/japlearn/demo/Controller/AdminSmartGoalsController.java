@@ -21,8 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import japlearn.demo.Entity.Classes;
+import japlearn.demo.Entity.SmartRefactoringPriority;
 import japlearn.demo.Entity.User;
 import japlearn.demo.Repository.ClassesRepository;
+import japlearn.demo.Repository.SmartRefactoringPriorityRepository;
 import japlearn.demo.Repository.UserRepository;
 import japlearn.demo.Service.SmartGoalsService;
 import japlearn.demo.Service.SmartSurveyService;
@@ -36,9 +38,11 @@ public class AdminSmartGoalsController {
     private final SmartSurveyService surveys;
     private final ClassesRepository classes;
     private final UserRepository users;
+    private final SmartRefactoringPriorityRepository priorities;
 
     public AdminSmartGoalsController(SmartGoalsService goals, SmartSurveyService surveys,
-            ClassesRepository classes, UserRepository users) {
+            ClassesRepository classes, UserRepository users, SmartRefactoringPriorityRepository priorities) {
+        this.priorities = priorities;
         this.goals = goals;
         this.surveys = surveys;
         this.classes = classes;
@@ -64,6 +68,53 @@ public class AdminSmartGoalsController {
             }
         }
         return ResponseEntity.ok(goals.report(new SmartGoalsService.Filters(from, to, classCode, studentId, module, includeUnapproved)));
+    }
+
+    // ---- Requirements & Design Refactoring priorities (written by the team from validation evidence)
+
+    @GetMapping("/refactoring")
+    public List<SmartRefactoringPriority> listPriorities() {
+        return priorities.findAllByOrderByRankAscUpdatedAtAsc();
+    }
+
+    public record PriorityRequest(String id, String goalKey, Integer rank, Boolean included, String learned, String evidence,
+            String objective, String aspect, String expectedImprovement) {}
+
+    @PostMapping("/refactoring")
+    public ResponseEntity<?> savePriority(@RequestBody PriorityRequest request,
+            @RequestHeader(value = "X-Portal-Token", required = false) String token) {
+        if (request == null) return error("Missing priority.");
+        String goal = request.goalKey() == null ? "" : request.goalKey().trim().toUpperCase(Locale.ROOT);
+        if (!List.of("SMART1", "SMART2", "SMART3", "SMART4", "OTHER").contains(goal)) return error("Choose a SMART objective.");
+        SmartRefactoringPriority p = request.id() == null || request.id().isBlank()
+                ? new SmartRefactoringPriority()
+                : priorities.findById(request.id()).orElse(null);
+        if (p == null) return ResponseEntity.notFound().build();
+        p.setGoalKey(goal);
+        p.setRank(request.rank() == null ? p.getRank() : Math.max(0, Math.min(99, request.rank())));
+        if (request.included() != null) p.setIncluded(request.included());
+        p.setLearned(text(request.learned()));
+        p.setEvidence(text(request.evidence()));
+        p.setObjective(text(request.objective()));
+        p.setAspect(text(request.aspect()));
+        p.setExpectedImprovement(text(request.expectedImprovement()));
+        p.setUpdatedAt(Instant.now());
+        p.setUpdatedBy(adminName(token));
+        return ResponseEntity.ok(priorities.save(p));
+    }
+
+    @DeleteMapping("/refactoring/{id}")
+    public ResponseEntity<?> deletePriority(@PathVariable String id) {
+        if (!priorities.existsById(id)) return ResponseEntity.notFound().build();
+        priorities.deleteById(id);
+        return ResponseEntity.ok(Map.of("deleted", id));
+    }
+
+    /** Plain text only: control characters (except line breaks) and angle brackets removed, capped at 3000. */
+    private static String text(String value) {
+        if (value == null) return "";
+        String v = value.replaceAll("[\\p{Cntrl}&&[^\\n]]|[<>]", " ").trim();
+        return v.length() > 3000 ? v.substring(0, 3000) : v;
     }
 
     /** Matched respondents: questionnaire agreement beside measured performance, same filters as /report. */
