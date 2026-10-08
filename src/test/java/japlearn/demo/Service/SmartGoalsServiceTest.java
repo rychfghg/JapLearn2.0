@@ -36,13 +36,16 @@ class SmartGoalsServiceTest {
     private final StudentRepository students = mock(StudentRepository.class);
     private final SituationalAttemptRepository situational = mock(SituationalAttemptRepository.class);
     private final ReplyCoachAttemptRepository coach = mock(ReplyCoachAttemptRepository.class);
+    private final japlearn.demo.Repository.SituationalRunRepository runRepo = mock(japlearn.demo.Repository.SituationalRunRepository.class);
+    private final japlearn.demo.Repository.DialogueRelayProgressRepository relayRepo = mock(japlearn.demo.Repository.DialogueRelayProgressRepository.class);
     private final ScoreRepository scoreRepo = mock(ScoreRepository.class);
     private final QuackTalkSessionRepository talkRepo = mock(QuackTalkSessionRepository.class);
     private final japlearn.demo.Repository.ReplyCoachChapterRepository chapterRepo = mock(japlearn.demo.Repository.ReplyCoachChapterRepository.class);
     private final SmartGoalsService service = new SmartGoalsService(users, students, mock(ClassesRepository.class),
             situational, coach, scoreRepo, mock(ResponseRushProgressRepository.class),
             talkRepo,
-            chapterRepo, mock(japlearn.demo.Repository.GuidedPhraseDailyPracticeRepository.class));
+            chapterRepo, mock(japlearn.demo.Repository.GuidedPhraseDailyPracticeRepository.class), runRepo, relayRepo,
+            mock(japlearn.demo.Repository.SituationalQuestionRepository.class));
 
     private static User student(String id, String email) {
         User u = new User();
@@ -57,6 +60,41 @@ class SmartGoalsServiceTest {
         return a;
     }
 
+    private static SituationalAttempt cyPartial() {
+        SituationalAttempt a = run("cy@gmail.com", "POLITENESS", 2, 10, false, "2026-09-03T00:00:00Z");
+        a.setSetNumber(5);
+        return a;
+    }
+
+    @Test
+    void unfinishedRunsScoreOnlyAnsweredQuestionsAndRecordWhereStudentsStopped() {
+        when(users.findByRoleIgnoreCase("student")).thenReturn(List.of(student("1", "ana@gmail.com"), student("2", "ben@gmail.com")));
+        when(students.findAll()).thenReturn(List.of());
+        when(situational.findAll()).thenReturn(List.of());
+        when(coach.findAll()).thenReturn(List.of());
+        japlearn.demo.Entity.SituationalRun rescue = new japlearn.demo.Entity.SituationalRun();
+        rescue.setEmail("ana@gmail.com"); rescue.setGameType("RECOGNITION");
+        rescue.setCorrectCount(4); rescue.setEasyMistakes(1); rescue.setHardMistakes(1); // quit after 6 answers
+        rescue.setUpdatedAt(Instant.parse("2026-09-01T00:00:00Z"));
+        when(runRepo.findAll()).thenReturn(List.of(rescue));
+        japlearn.demo.Entity.DialogueRelayProgress relay = new japlearn.demo.Entity.DialogueRelayProgress();
+        relay.setEmail("ben@gmail.com"); relay.setAnswered(10); relay.setCorrect(3); relay.setUpdatedAt(Instant.parse("2026-09-02T00:00:00Z"));
+        when(relayRepo.findAll()).thenReturn(List.of(relay));
+
+        Map<String, Object> report = service.report(new SmartGoalsService.Filters(null, null, null, null, null, false));
+        Map<String, Object> s1 = goal(report, "SMART1");
+        assertThat(s1.get("correct")).isEqualTo(4);
+        assertThat(s1.get("total")).isEqualTo(6);
+        Map<String, Object> s2 = goal(report, "SMART2");
+        assertThat(s2.get("correct")).isEqualTo(3);
+        assertThat(s2.get("total")).isEqualTo(10);
+        List<Map<String, Object>> drop = (List<Map<String, Object>>) report.get("dropOff");
+        assertThat(drop).extracting(m -> m.get("label")).contains("Ahiru Rescue", "Dialogue Relay");
+        Map<String, Object> s4 = goal(report, "SMART4");
+        assertThat(s4.get("correct")).isEqualTo(0);      // started but unfinished is never completed
+        assertThat(s4.get("incomplete")).isEqualTo(2);
+    }
+
     private Map<String, Object> goal(Map<String, Object> report, String key) {
         return ((List<Map<String, Object>>) report.get("goals")).stream().filter(g -> key.equals(g.get("key"))).findFirst().orElseThrow();
     }
@@ -69,7 +107,7 @@ class SmartGoalsServiceTest {
                 run("ana@gmail.com", "RECOGNITION", 6, 10, true, "2026-09-01T00:00:00Z"),
                 run("ana@gmail.com", "RECOGNITION", 10, 10, true, "2026-09-02T00:00:00Z"), // replay: ignored
                 run("ben@gmail.com", "RECOGNITION", 9, 10, true, "2026-09-03T00:00:00Z"),
-                run("cy@gmail.com", "POLITENESS", 2, 10, false, "2026-09-03T00:00:00Z")));
+                cyPartial()));
         when(coach.findAll()).thenReturn(List.of());
 
         Map<String, Object> report = service.report(new SmartGoalsService.Filters(null, null, null, null, null, false));
@@ -79,11 +117,16 @@ class SmartGoalsServiceTest {
         assertThat(s1.get("percentage")).isEqualTo(75.0);
         assertThat(s1.get("status")).isEqualTo("NOT_ACHIEVED");
         assertThat(s1.get("noParticipation")).isEqualTo(1);
+        Map<String, Object> signals = (Map<String, Object>) report.get("signals");
+        assertThat(signals.get("retries")).isEqualTo(1);       // ana replayed Ahiru Rescue
+        assertThat(signals.get("incorrect")).isEqualTo(8);     // 4 (ana first run) + 1 (ben) + 3 (cy, unfinished Politeness)
+        assertThat(signals.get("technicalFailures")).isNull(); // not stored by the app, never invented
 
         Map<String, Object> s3 = goal(report, "SMART3");
-        assertThat(s3.get("status")).isEqualTo("INSUFFICIENT_DATA");
-        assertThat(s3.get("percentage")).isNull();
-        assertThat(s3.get("incomplete")).isEqualTo(1);
+        assertThat(s3.get("correct")).isEqualTo(2);           // unfinished Politeness run still counts
+        assertThat(s3.get("total")).isEqualTo(5);             // only the 5 questions actually answered
+        assertThat(s3.get("unfinishedAnswers")).isEqualTo(5);
+        assertThat(s3.get("status")).isEqualTo("NOT_ACHIEVED");
         assertThat(goal(report, "SMART4").get("status")).isEqualTo("NOT_ACHIEVED"); // records exist, so completion is measurable
     }
 

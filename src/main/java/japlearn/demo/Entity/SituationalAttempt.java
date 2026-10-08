@@ -17,6 +17,14 @@ public class SituationalAttempt {
     private int maxScore;
     private int totalQuestions;
     private int correctAnswers;
+    /** Hints opened during the run (sent by Ahiru Rescue from this version on; null on older runs). */
+    private Integer hintsUsed;
+    /** Questions answered when a run was left unfinished (Politeness partial saves, from this version on). */
+    private Integer answeredCount;
+    public Integer getAnsweredCount() { return answeredCount; }
+    public void setAnsweredCount(Integer answeredCount) { this.answeredCount = answeredCount; }
+    public Integer getHintsUsed() { return hintsUsed; }
+    public void setHintsUsed(Integer hintsUsed) { this.hintsUsed = hintsUsed; }
     private int wrongAnswers;
     private double accuracy;
     private int stars;

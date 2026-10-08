@@ -56,6 +56,8 @@ public class StudentOwnershipFilter extends OncePerRequestFilter {
         new Rule("POST", Pattern.compile("^/api/scores/(save|high-score)$"), Source.BODY, false),
         new Rule("POST", Pattern.compile("^/api/users/daily-goal/(minute|complete)$"), Source.BODY, false),
         new Rule("PUT", Pattern.compile("^/api/response-rush/progress$"), Source.QUERY, false),
+        new Rule("PUT", Pattern.compile("^/api/dialogue-relay/progress$"), Source.QUERY, false),
+        new Rule("DELETE", Pattern.compile("^/api/dialogue-relay/progress$"), Source.QUERY, false),
         new Rule("POST", Pattern.compile("^/api/situational/attempts$"), Source.BODY, false),
         new Rule("PUT", Pattern.compile("^/api/situational/runs/current$"), Source.BODY, false),
         new Rule("POST", Pattern.compile("^/api/reply-coach/attempts/start$"), Source.BODY, false),

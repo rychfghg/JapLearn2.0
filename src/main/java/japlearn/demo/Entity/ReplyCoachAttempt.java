@@ -41,6 +41,10 @@ public class ReplyCoachAttempt {
         private String evaluation;
         private int points;
         private String explanation;
+        /** Whether the learner opened the hint before answering (recorded from this version on; null on older answers). */
+        private Boolean hintUsed;
+        public Boolean getHintUsed() { return hintUsed; }
+        public void setHintUsed(Boolean hintUsed) { this.hintUsed = hintUsed; }
         private String culturalNote;
         private Instant answeredAt = Instant.now();
 

@@ -31,7 +31,12 @@ import japlearn.demo.Entity.Student;
 import japlearn.demo.Entity.User;
 import japlearn.demo.Entity.GuidedPhraseDailyPractice;
 import japlearn.demo.Entity.ReplyCoachChapter;
+import japlearn.demo.Entity.DialogueRelayProgress;
+import japlearn.demo.Entity.SituationalRun;
 import japlearn.demo.Repository.ClassesRepository;
+import japlearn.demo.Repository.DialogueRelayProgressRepository;
+import japlearn.demo.Repository.SituationalQuestionRepository;
+import japlearn.demo.Repository.SituationalRunRepository;
 import japlearn.demo.Repository.GuidedPhraseDailyPracticeRepository;
 import japlearn.demo.Repository.ReplyCoachChapterRepository;
 import japlearn.demo.Repository.QuackTalkSessionRepository;
@@ -81,7 +86,8 @@ public class SmartGoalsService {
             "Dialogue Relay: 25 dialogue choices plus the spoken bonus prompts, where a bonus counts as correct only when the reply is judged appropriate to the context (not by pronunciation).",
             "Talk with Sumi: each learner turn is one scored response; it is correct when Japanese was attempted and the context score is at least " + SUMI_CONTEXT_PASS + "/100. Pronunciation, accuracy, fluency and completeness scores are never used. Sessions saved before per-turn context scores were recorded are not measurable.",
             "SMART 3 uses QuackSituate Politeness plus Reply Coach questions an admin has explicitly tagged as politeness. Expression Match and Response Rush do not store per-question answers, so their items cannot be tagged and are not counted.",
-            "Students without records are 'No participation' and students with only unfinished runs are 'Incomplete'; neither is counted as zero.",
+            "Unfinished runs count: when a student's first attempt was never finished, the questions they actually answered before stopping are scored as correct or incorrect. Questions they never reached are not counted either way. Answers from unfinished runs are reported separately.",
+            "Students without any records are 'No participation' and are not counted as zero.",
             "Completion = activities completed / (8 communication activities x eligible students) x 100: Ahiru Rescue, Expression Match, Politeness, Reply Coach, Response Rush, Dialogue Relay, Talk with Sumi and Guided Phrase Practice. Each activity counts once per student when finished at least once in the period.",
             "An activity is completed only from finished game progress records (QuackSituate runs marked completed, Reply Coach chapters marked COMPLETED, finished Response Rush and Dialogue Relay runs, Talk with Sumi sessions with at least one learner turn, completed Guided Phrase sessions). Started-but-unfinished activities count as not completed. Questionnaire answers are never used.",
             "A goal shows 'Insufficient Data' when its denominator is 0.");
@@ -96,12 +102,19 @@ public class SmartGoalsService {
     private final QuackTalkSessionRepository quackTalk;
     private final ReplyCoachChapterRepository chapters;
     private final GuidedPhraseDailyPracticeRepository guidedPractice;
+    private final SituationalRunRepository situationalRuns;
+    private final DialogueRelayProgressRepository relayProgress;
+    private final SituationalQuestionRepository situationalQuestions;
 
     public SmartGoalsService(UserRepository users, StudentRepository students, ClassesRepository classes,
             SituationalAttemptRepository situational, ReplyCoachAttemptRepository replyCoach, ScoreRepository scores,
             ResponseRushProgressRepository rushProgress, QuackTalkSessionRepository quackTalk,
             ReplyCoachChapterRepository chapters,
-            GuidedPhraseDailyPracticeRepository guidedPractice) {
+            GuidedPhraseDailyPracticeRepository guidedPractice, SituationalRunRepository situationalRuns,
+            DialogueRelayProgressRepository relayProgress, SituationalQuestionRepository situationalQuestions) {
+        this.situationalRuns = situationalRuns;
+        this.relayProgress = relayProgress;
+        this.situationalQuestions = situationalQuestions;
         this.chapters = chapters;
         this.guidedPractice = guidedPractice;
         this.users = users;
@@ -126,6 +139,7 @@ public class SmartGoalsService {
     static final class Tally {
         int correct;
         int total;
+        int unfinishedAnswers;
         boolean incomplete;
         Instant last;
         final Set<String> dates = new TreeSet<>();
@@ -134,6 +148,11 @@ public class SmartGoalsService {
             correct += right;
             total += scored;
             touch(at);
+        }
+
+        void addUnfinished(int right, int scored, Instant at) {
+            add(right, scored, at);
+            unfinishedAnswers += scored;
         }
 
         void touch(Instant at) {
@@ -148,6 +167,7 @@ public class SmartGoalsService {
             m.put("total", total);
             m.put("percentage", total > 0 ? round(correct * 100.0 / total) : null);
             m.put("status", total > 0 ? "MEASURED" : incomplete ? "INCOMPLETE" : "NO_PARTICIPATION");
+            m.put("unfinishedAnswers", unfinishedAnswers);
             return m;
         }
     }
@@ -188,6 +208,33 @@ public class SmartGoalsService {
         return out;
     }
 
+    /** Where students stopped an unfinished first attempt: answers reached, out of the run length when known. */
+    private static void stop(Map<String, List<int[]>> stops, String label, int reached, Integer outOf) {
+        stops.computeIfAbsent(label, k -> new ArrayList<>()).add(new int[] { reached, outOf == null ? -1 : outOf });
+    }
+
+    private static List<Map<String, Object>> dropOff(Map<String, List<int[]>> stops) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map.Entry<String, List<int[]>> e : stops.entrySet()) {
+            List<int[]> list = e.getValue();
+            Map<Integer, Integer> at = new java.util.TreeMap<>();
+            int outOf = -1;
+            for (int[] x : list) { at.merge(x[0], 1, Integer::sum); outOf = Math.max(outOf, x[1]); }
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("label", e.getKey());
+            m.put("students", list.size());
+            m.put("outOf", outOf < 0 ? null : outOf);
+            m.put("averageReached", round(list.stream().mapToInt(x -> x[0]).average().orElse(0)));
+            List<Map<String, Object>> points = new ArrayList<>();
+            for (Map.Entry<Integer, Integer> a : at.entrySet()) points.add(Map.of("answered", a.getKey(), "students", a.getValue()));
+            points.sort((x, y) -> Integer.compare((Integer) y.get("students"), (Integer) x.get("students")));
+            m.put("stopPoints", points);
+            out.add(m);
+        }
+        out.sort((x, y) -> Integer.compare((Integer) y.get("students"), (Integer) x.get("students")));
+        return out;
+    }
+
     private static final class StudentRow {
         final User user;
         final String classCode;
@@ -195,6 +242,7 @@ public class SmartGoalsService {
         final Map<String, Tally> goals = new LinkedHashMap<>();
         int runsAttempted;
         int runsCompleted;
+        int retries, hints, hintRecords, timeouts, incompleteActivities;
         int activitiesCompleted;
         final List<Map<String, Object>> activityStatus = new ArrayList<>();
         final Set<String> dates = new TreeSet<>();
@@ -214,6 +262,7 @@ public class SmartGoalsService {
         Map<String, Integer> excluded = new LinkedHashMap<>();
         Map<String, Map<String, Area>> areas = new LinkedHashMap<>();
         Map<String, Integer> coachEvaluations = new LinkedHashMap<>();
+        Map<String, List<int[]>> stops = new LinkedHashMap<>();
         Map<String, Integer> read = new LinkedHashMap<>();
 
         // ---- cohort
@@ -249,16 +298,26 @@ public class SmartGoalsService {
         List<SituationalAttempt> sit = situational.findAll();
         read.put("situational_attempts", sit.size());
         Map<String, List<SituationalAttempt>> sitByStudent = groupByEmail(sit, SituationalAttempt::getEmail, cohort);
+        List<SituationalRun> runs = situationalRuns.findAll();
+        read.put("situational_runs_unfinished", runs.size());
+        Map<String, List<SituationalRun>> runsByStudent = groupByEmail(runs, SituationalRun::getEmail, cohort);
+        Map<String, Integer> runLength = new java.util.HashMap<>(); // questions per game/level, for "stopped at X of Y"
+        for (String type : List.of("RECOGNITION", "EXPRESSION_MATCH", "POLITENESS")) {
+            var qs = situationalQuestions.findByGameTypeIgnoreCaseAndActiveTrueOrderByOrderAsc(type);
+            runLength.put(type + "|0", qs.size());
+            for (var q : qs) runLength.merge(type + "|" + q.getLevel(), 1, Integer::sum);
+        }
         for (StudentRow row : cohort.values()) {
             List<SituationalAttempt> mine = sitByStudent.getOrDefault(row.email, List.of());
             Map<String, SituationalAttempt> firstRun = new LinkedHashMap<>();
+            Map<String, SituationalAttempt> partials = new LinkedHashMap<>();
             for (SituationalAttempt a : mine) {
                 String type = upper(a.getGameType());
                 if (!SOURCE_GOAL.containsKey(type) || !sources.contains(type) || !inPeriod(a.getCompletedAt(), from, to)) continue;
                 row.runsAttempted++;
                 addDay(row.dates, a.getCompletedAt());
                 Tally tally = row.goals.get(SOURCE_GOAL.get(type));
-                if (!a.isCompleted()) { tally.incomplete = true; continue; }
+                if (!a.isCompleted()) { tally.incomplete = true; partials.merge(type + "|" + a.getLevel(), a, (x, y) -> answeredIn(y) > answeredIn(x) ? y : x); continue; }
                 row.runsCompleted++;
                 if (a.getTotalQuestions() <= 0 || a.getCorrectAnswers() < 0 || a.getCorrectAnswers() > a.getTotalQuestions()) {
                     excluded.merge("situational: invalid correct/total", 1, Integer::sum);
@@ -267,17 +326,62 @@ public class SmartGoalsService {
                 String key = type + "|" + a.getLevel() + "|" + a.getSetNumber();
                 SituationalAttempt seen = firstRun.get(key);
                 if (seen == null || before(a.getCompletedAt(), seen.getCompletedAt())) {
-                    if (seen != null) excluded.merge("situational: repeat runs after the first", 1, Integer::sum);
+                    if (seen != null) { excluded.merge("situational: repeat runs after the first", 1, Integer::sum); row.retries++; }
                     firstRun.put(key, a);
                 } else {
                     excluded.merge("situational: repeat runs after the first", 1, Integer::sum);
+                    row.retries++;
                 }
             }
             for (SituationalAttempt a : firstRun.values()) {
+                if (a.getHintsUsed() != null) { row.hints += a.getHintsUsed(); row.hintRecords++; }
                 String type = upper(a.getGameType());
                 row.goals.get(SOURCE_GOAL.get(type)).add(a.getCorrectAnswers(), a.getTotalQuestions(), a.getCompletedAt());
                 area(areas, SOURCE_GOAL.get(type), SOURCE_LABEL.get(type) + (type.equals("RECOGNITION") || a.getLevel() <= 0 ? "" : " · Level " + a.getLevel()),
                         a.getCorrectAnswers(), a.getTotalQuestions(), row.email);
+            }
+            // Game/levels with a finished run use it; otherwise the unfinished run is the first attempt.
+            Set<String> finished = new java.util.HashSet<>();
+            for (SituationalAttempt a : firstRun.values()) {
+                String type = upper(a.getGameType());
+                finished.add(type.equals("RECOGNITION") ? "RECOGNITION|0" : type + "|" + a.getLevel());
+            }
+            Map<String, int[]> unfinished = new LinkedHashMap<>(); // key -> {correct, answered}
+            Map<String, Instant> unfinishedAt = new java.util.HashMap<>();
+            for (SituationalAttempt a : partials.values()) { // Politeness saves a partial result when the learner leaves
+                String key = "POLITENESS|" + a.getLevel();
+                int answered = answeredIn(a);
+                if (finished.contains(key) || answered <= 0) continue;
+                unfinished.put(key, new int[] { Math.min(a.getCorrectAnswers(), answered), answered });
+                unfinishedAt.put(key, a.getCompletedAt());
+            }
+            for (SituationalRun r : runsByStudent.getOrDefault(row.email, List.of())) { // Ahiru Rescue / Expression Match current run
+                String g = upper(r.getGameType());
+                String key;
+                int answered;
+                if (g.equals("RECOGNITION")) { key = "RECOGNITION|0"; answered = r.getCorrectCount() + r.getEasyMistakes() + r.getHardMistakes(); }
+                else if (g.startsWith("EXPRESSION_MATCH_LEVEL_")) {
+                    int level;
+                    try { level = Integer.parseInt(g.substring("EXPRESSION_MATCH_LEVEL_".length())); } catch (Exception e) { continue; }
+                    key = "EXPRESSION_MATCH|" + level;
+                    answered = r.getCorrectCount() + r.getEasyMistakes(); // the app stores Expression Match mistakes once in easyMistakes
+                } else continue;
+                String type = key.substring(0, key.indexOf('|'));
+                if (!sources.contains(type) || !inPeriod(r.getUpdatedAt(), from, to) || finished.contains(key) || answered <= 0) continue;
+                row.runsAttempted++;
+                addDay(row.dates, r.getUpdatedAt());
+                unfinished.put(key, new int[] { Math.min(r.getCorrectCount(), answered), answered });
+                unfinishedAt.put(key, r.getUpdatedAt());
+            }
+            for (Map.Entry<String, int[]> e : unfinished.entrySet()) {
+                String type = e.getKey().substring(0, e.getKey().indexOf('|'));
+                int level = Integer.parseInt(e.getKey().substring(e.getKey().indexOf('|') + 1));
+                if (!sources.contains(type)) continue;
+                int[] v = e.getValue();
+                row.goals.get(SOURCE_GOAL.get(type)).addUnfinished(v[0], v[1], unfinishedAt.get(e.getKey()));
+                String label = SOURCE_LABEL.get(type) + (level <= 0 ? "" : " · Level " + level);
+                area(areas, SOURCE_GOAL.get(type), label, v[0], v[1], row.email);
+                stop(stops, label, v[1], runLength.get(type + "|" + level));
             }
         }
 
@@ -304,6 +408,7 @@ public class SmartGoalsService {
                     if ("COMPLETED".equalsIgnoreCase(a.getStatus())) row.runsCompleted++;
                     ReplyCoachAttempt seen = firstAttempt.get(a.getChapterId());
                     if (seen == null || earlierCoach(a, seen)) firstAttempt.put(a.getChapterId(), a);
+                    if (seen != null) row.retries++; // a second attempt at the same chapter
                 }
                 Tally tally = row.goals.get("SMART2");
                 Tally polite = row.goals.get("SMART3");
@@ -317,6 +422,8 @@ public class SmartGoalsService {
                         scored++;
                         boolean good = isGood(ans.getEvaluation());
                         coachEvaluations.merge(upper(ans.getEvaluation()), 1, Integer::sum);
+                        if ("TIMEOUT".equals(upper(ans.getEvaluation()))) row.timeouts++;
+                        if (ans.getHintUsed() != null) { row.hintRecords++; if (ans.getHintUsed()) row.hints++; }
                         if (good) right++;
                         if (politenessNodes.contains(a.getChapterId() + "|" + ans.getNodeId())) {
                             politeScored++;
@@ -326,8 +433,9 @@ public class SmartGoalsService {
                     }
                     if (scored == 0) { tally.incomplete = true; continue; }
                     Instant at = last == null ? a.getStartedAt() : last;
-                    tally.add(right, scored, at);
                     String chapterName = chapterTitles.getOrDefault(a.getChapterId(), a.getChapterId());
+                    if ("COMPLETED".equalsIgnoreCase(a.getStatus())) tally.add(right, scored, at);
+                    else { tally.addUnfinished(right, scored, at); stop(stops, "Reply Coach · " + chapterName, scored, null); }
                     area(areas, "SMART2", "Reply Coach · " + chapterName, right, scored, row.email);
                     if (politeScored > 0) {
                         polite.add(politeRight, politeScored, at);
@@ -342,6 +450,9 @@ public class SmartGoalsService {
         read.put("scores", allScores.size());
         Map<String, List<Score>> scoresByStudent = groupByEmail(allScores, Score::getEmail, cohort);
         Map<String, ResponseRushProgress> openRush = !sources.contains("RESPONSE_RUSH") ? Map.of() : rushProgress.findAll().stream()
+                .filter(p -> p.getEmail() != null)
+                .collect(Collectors.toMap(p -> p.getEmail().trim().toLowerCase(Locale.ROOT), p -> p, (a, b) -> a));
+        Map<String, DialogueRelayProgress> openRelay = !sources.contains("DIALOGUE_RELAY") ? Map.of() : relayProgress.findAll().stream()
                 .filter(p -> p.getEmail() != null)
                 .collect(Collectors.toMap(p -> p.getEmail().trim().toLowerCase(Locale.ROOT), p -> p, (a, b) -> a));
         for (String[] game : new String[][] { { "RESPONSE_RUSH", "QUACKRESPONSE_RUSH", "response rush" }, { "DIALOGUE_RELAY", "QUACKRESPONSE_RELAY", "dialogue relay" } }) {
@@ -361,10 +472,11 @@ public class SmartGoalsService {
                         continue;
                     }
                     if (first == null || before(at, scoreTime(first))) {
-                        if (first != null) excluded.merge(game[2] + ": repeat runs after the first", 1, Integer::sum);
+                        if (first != null) { excluded.merge(game[2] + ": repeat runs after the first", 1, Integer::sum); row.retries++; }
                         first = s;
                     } else {
                         excluded.merge(game[2] + ": repeat runs after the first", 1, Integer::sum);
+                        row.retries++;
                     }
                 }
                 Tally tally = row.goals.get("SMART2");
@@ -375,7 +487,33 @@ public class SmartGoalsService {
                 else if (game[0].equals("RESPONSE_RUSH")) {
                     ResponseRushProgress open = openRush.get(row.email);
                     if (open != null && !open.isCompleted() && open.getAnswers() != null && !open.getAnswers().isEmpty()
-                            && inPeriod(open.getUpdatedAt(), from, to)) tally.incomplete = true;
+                            && inPeriod(open.getUpdatedAt(), from, to)) {
+                        int answered = 0, right = 0;
+                        for (Map<String, Object> ans : open.getAnswers()) {
+                            Object ev = ans.get("evaluation");
+                            if (ev == null || String.valueOf(ev).isBlank()) continue;
+                            answered++;
+                            if (isGood(String.valueOf(ev))) right++;
+                        }
+                        if (answered > 0) {
+                            row.runsAttempted++;
+                            tally.addUnfinished(right, answered, open.getUpdatedAt());
+                            area(areas, "SMART2", "Response Rush", right, answered, row.email);
+                            stop(stops, "Response Rush", answered, null);
+                        } else tally.incomplete = true;
+                    }
+                } else {
+                    DialogueRelayProgress open = openRelay.get(row.email);
+                    if (open != null && inPeriod(open.getUpdatedAt(), from, to)) {
+                        int answered = open.getAnswered() + open.getBonusAnswered();
+                        int right = Math.min(answered, open.getCorrect() + open.getBonusCorrect());
+                        if (answered > 0) {
+                            row.runsAttempted++;
+                            tally.addUnfinished(right, answered, open.getUpdatedAt());
+                            area(areas, "SMART2", "Dialogue Relay", right, answered, row.email);
+                            stop(stops, "Dialogue Relay", answered, 30);
+                        }
+                    }
                 }
             }
         }
@@ -398,9 +536,9 @@ public class SmartGoalsService {
                         continue;
                     }
                     if (first == null || before(t.getPracticedAt(), first.getPracticedAt())) {
-                        if (first != null) excluded.merge("talk with sumi: repeat sessions after the first", 1, Integer::sum);
+                        if (first != null) { excluded.merge("talk with sumi: repeat sessions after the first", 1, Integer::sum); row.retries++; }
                         first = t;
-                    } else excluded.merge("talk with sumi: repeat sessions after the first", 1, Integer::sum);
+                    } else { excluded.merge("talk with sumi: repeat sessions after the first", 1, Integer::sum); row.retries++; }
                 }
                 if (first == null) continue;
                 int right = 0, scored = 0;
@@ -436,8 +574,10 @@ public class SmartGoalsService {
                     row.activitiesCompleted++;
                     completedTotal++;
                     if (lastCompletion == null || done.isAfter(lastCompletion)) lastCompletion = done;
-                } else if (started(key, row.email, from, to, sitByStudent, coachAll, scoresByStudent, talksByStudent, guidedByStudent, openRush)) {
+                } else if (started(key, row.email, from, to, sitByStudent, coachAll, scoresByStudent, talksByStudent, guidedByStudent, openRush)
+                        || startedUnfinished(key, row.email, from, to, runsByStudent, openRelay)) {
                     status = "STARTED";
+                    row.incompleteActivities++;
                     startedTotal++;
                 } else status = "NOT_STARTED";
                 if (!status.equals("NOT_STARTED")) any = true;
@@ -512,6 +652,7 @@ public class SmartGoalsService {
             r.put("SMART4", s4);
             r.put("runsAttempted", row.runsAttempted);
             r.put("runsCompleted", row.runsCompleted);
+            r.put("signals", signals(row));
             r.put("assessmentDates", new ArrayList<>(row.dates));
             rows.add(r);
         }
@@ -541,15 +682,50 @@ public class SmartGoalsService {
         out.put("studentOptions", studentOptions);
         out.put("audit", Map.of("recordsRead", read, "recordsExcluded", excluded));
         out.put("replyCoachEvaluations", coachEvaluations);
+        out.put("dropOff", dropOff(stops));
+        Map<String, Object> cohortSignals = new LinkedHashMap<>();
+        for (String k : List.of("incorrect", "retries", "hints", "timeouts", "incompleteActivities")) {
+            int sum = 0;
+            for (Map<String, Object> r : rows) {
+                Object v = ((Map<?, ?>) r.get("signals")).get(k);
+                if (v instanceof Number n) sum += n.intValue();
+            }
+            cohortSignals.put(k, sum);
+        }
+        cohortSignals.put("hintRecords", cohort.values().stream().mapToInt(x -> x.hintRecords).sum());
+        cohortSignals.put("technicalFailures", null);
+        cohortSignals.put("notes", List.of(
+                "Incorrect = scored answers that were wrong in first evaluation attempts (SMART 1-3).",
+                "Retries = runs, chapter attempts or Sumi sessions played again after the first one in the period; they never change the score.",
+                "Hints are recorded only for Ahiru Rescue runs and Reply Coach answers saved after hint tracking was added; older records show no hint data.",
+                "Timeouts = Reply Coach answers rated TIMEOUT. Response Rush and Dialogue Relay save only run totals, so their timeouts are counted as incorrect answers, not separately.",
+                "Incomplete = activities a student started but did not finish in the period.",
+                "Technical failures (failed speech or AI assessments, failed saves) are not stored by the app, so they cannot be counted."));
+        out.put("signals", cohortSignals);
         return out;
+    }
+
+    private static Map<String, Object> signals(StudentRow row) {
+        Map<String, Object> s = new LinkedHashMap<>();
+        int incorrect = 0;
+        for (String g : List.of("SMART1", "SMART2", "SMART3")) { Tally t = row.goals.get(g); incorrect += t.total - t.correct; }
+        s.put("incorrect", incorrect);
+        s.put("retries", row.retries);
+        s.put("hints", row.hintRecords > 0 ? row.hints : null);
+        s.put("timeouts", row.timeouts);
+        s.put("incompleteActivities", row.incompleteActivities);
+        s.put("technicalFailures", null);
+        return s;
     }
 
     private Map<String, Object> goal(String key, String name, int target, Map<String, StudentRow> cohort, String goalKey,
             String evidence, List<String> limitations) {
-        int correct = 0, total = 0, participating = 0, incomplete = 0, none = 0;
+        int correct = 0, total = 0, participating = 0, incomplete = 0, none = 0, unfinishedAnswers = 0, unfinishedStudents = 0;
         Instant last = null;
         for (StudentRow row : cohort.values()) {
             Tally t = row.goals.get(goalKey);
+            unfinishedAnswers += t.unfinishedAnswers;
+            if (t.unfinishedAnswers > 0) unfinishedStudents++;
             correct += t.correct;
             total += t.total;
             if (t.total > 0) participating++;
@@ -565,6 +741,8 @@ public class SmartGoalsService {
         g.put("total", total);
         g.put("percentage", total > 0 ? round(correct * 100.0 / total) : null);
         g.put("status", total == 0 ? "INSUFFICIENT_DATA" : correct * 100.0 / total >= target ? "ACHIEVED" : "NOT_ACHIEVED");
+        g.put("unfinishedAnswers", unfinishedAnswers);
+        g.put("unfinishedStudents", unfinishedStudents);
         g.put("eligibleStudents", cohort.size());
         g.put("participatingStudents", participating);
         g.put("noParticipation", none);
@@ -642,6 +820,25 @@ public class SmartGoalsService {
                     .anyMatch(g -> g.getSessionsStarted() > 0 && inPeriod(guidedDay(g), from, to));
             default -> false;
         };
+    }
+
+    /** Unfinished runs saved on the server (Ahiru Rescue, Expression Match, Dialogue Relay) also mean the activity was started. */
+    private static boolean startedUnfinished(String key, String email, Instant from, Instant to,
+            Map<String, List<SituationalRun>> runs, Map<String, DialogueRelayProgress> relay) {
+        return switch (key) {
+            case "RECOGNITION" -> runs.getOrDefault(email, List.of()).stream()
+                    .anyMatch(r -> "RECOGNITION".equalsIgnoreCase(r.getGameType()) && inPeriod(r.getUpdatedAt(), from, to));
+            case "EXPRESSION_MATCH" -> runs.getOrDefault(email, List.of()).stream()
+                    .anyMatch(r -> upper(r.getGameType()).startsWith("EXPRESSION_MATCH_LEVEL_") && inPeriod(r.getUpdatedAt(), from, to));
+            case "DIALOGUE_RELAY" -> relay.containsKey(email) && inPeriod(relay.get(email).getUpdatedAt(), from, to);
+            default -> false;
+        };
+    }
+
+    /** Questions answered in a Politeness partial save: the app's explicit count, or (older saves) the question reached. */
+    private static int answeredIn(SituationalAttempt a) {
+        if (a.getAnsweredCount() != null) return Math.max(0, a.getAnsweredCount());
+        return Math.max(Math.max(0, a.getSetNumber()), Math.max(0, a.getCorrectAnswers()));
     }
 
     private static Instant guidedDay(GuidedPhraseDailyPractice g) {

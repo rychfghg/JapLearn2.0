@@ -234,6 +234,7 @@ public class ReplyCoachController {
         record.setSelectedJapanese(choice.getJapanese());
         record.setEvaluation(choice.getEvaluation());
         boolean hintUsed = Boolean.parseBoolean(request.getOrDefault("hintUsed", "false"));
+        record.setHintUsed(hintUsed);
         int earnedPoints = Math.max(0, choice.getPoints() - (hintUsed ? node.getHintPenalty() : 0));
         record.setPoints(earnedPoints);
         record.setExplanation(choice.getExplanation());
