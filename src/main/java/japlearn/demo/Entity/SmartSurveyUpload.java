@@ -37,6 +37,11 @@ public class SmartSurveyUpload {
         /** MATCHED, UNMATCHED, DUPLICATE or NO_IDENTIFIER */
         private String identifierStatus;
         private boolean counted;
+        /** Internal account id of the matched student (never the email). Null when not matched. */
+        private String studentId;
+
+        public String getStudentId() { return studentId; }
+        public void setStudentId(String studentId) { this.studentId = studentId; }
 
         public int getRowNumber() { return rowNumber; }
         public void setRowNumber(int rowNumber) { this.rowNumber = rowNumber; }

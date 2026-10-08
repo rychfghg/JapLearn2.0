@@ -103,6 +103,23 @@ public class AdminSmartGoalsController {
         return ResponseEntity.ok(Map.of("deleted", id));
     }
 
+    /** Matched respondents: questionnaire agreement beside measured performance, same filters as /report. */
+    @GetMapping("/surveys/{id}/comparison")
+    public ResponseEntity<?> comparison(@PathVariable String id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String classCode,
+            @RequestParam(required = false) String studentId,
+            @RequestParam(required = false) String module,
+            @RequestParam(defaultValue = "false") boolean includeUnapproved) {
+        try {
+            return ResponseEntity.ok(surveys.comparison(id,
+                    goals.report(new SmartGoalsService.Filters(from, to, classCode, studentId, module, includeUnapproved))));
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(Map.of("error", String.valueOf(e.getReason())));
+        }
+    }
+
     @GetMapping("/surveys")
     public List<Map<String, Object>> listSurveys() {
         return surveys.summaries();

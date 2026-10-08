@@ -88,9 +88,15 @@ public class SmartSurveyService {
                 throw bad("Question " + (q + 1) + " (\"" + clean(header.get(cols.get(q)), 80) + "\") does not contain Agree/Disagree answers. Check the column mapping.");
         }
 
-        Set<String> studentEmails = new HashSet<>();
-        for (User u : users.findByRoleIgnoreCase("student"))
-            if (u.getEmail() != null) studentEmails.add(u.getEmail().trim().toLowerCase(Locale.ROOT));
+        // Verified identifiers only: account email, account id, or the dashboard's student code. Never names.
+        Map<String, String> emailToId = new java.util.HashMap<>();
+        Map<String, String> idToId = new java.util.HashMap<>();
+        for (User u : users.findByRoleIgnoreCase("student")) {
+            if (u.getId() == null) continue;
+            if (u.getEmail() != null) emailToId.put(u.getEmail().trim().toLowerCase(Locale.ROOT), u.getId());
+            idToId.put(u.getId().toLowerCase(Locale.ROOT), u.getId());
+            idToId.put(SmartGoalsService.code(u).toLowerCase(Locale.ROOT), u.getId());
+        }
 
         boolean matchedOnly = Boolean.TRUE.equals(request.matchedOnly()) && idCol != null;
         SmartSurveyUpload upload = new SmartSurveyUpload();
@@ -117,10 +123,18 @@ public class SmartSurveyService {
                 status = "NO_IDENTIFIER";
                 noId++;
             } else {
-                String email;
-                try { email = EmailInput.normalize(cell(line, idCol)); } catch (RuntimeException e) { email = null; }
-                if (email != null && !seen.add(email)) { status = "DUPLICATE"; duplicate++; }
-                else if (email != null && studentEmails.contains(email)) { status = "MATCHED"; matched++; }
+                String raw = cell(line, idCol);
+                String studentId;
+                if (raw.contains("@")) {
+                    String email;
+                    try { email = EmailInput.normalize(raw); } catch (RuntimeException e) { email = null; }
+                    studentId = email == null ? null : emailToId.get(email);
+                } else {
+                    studentId = idToId.get(raw.trim().toLowerCase(Locale.ROOT));
+                }
+                String key = studentId != null ? "id:" + studentId : "raw:" + raw.trim().toLowerCase(Locale.ROOT);
+                if (!seen.add(key)) { status = "DUPLICATE"; duplicate++; }
+                else if (studentId != null) { status = "MATCHED"; matched++; row.setStudentId(studentId); }
                 else { status = "UNMATCHED"; unmatched++; }
             }
             row.setIdentifierStatus(status);
@@ -195,6 +209,110 @@ public class SmartSurveyService {
         out.put("noIdentifierRows", u.getNoIdentifierRows());
         out.put("questions", questions);
         out.put("groups", groups);
+        return out;
+    }
+
+    private static final String[] GOAL_KEYS = { "SMART1", "SMART2", "SMART3", "SMART4" };
+    /** Questionnaire group index (Q pairs) for each SMART goal: Q1-2, Q3-4, Q5-6, Q9-10. */
+    private static final int[] GOAL_GROUP = { 0, 1, 2, 4 };
+    private static final int[] GOAL_TARGET = { 80, 75, 75, 80 };
+
+    /**
+     * Per matched student: questionnaire agreement next to measured game performance for each goal,
+     * with the difference (actual - survey) in percentage points. The two are never averaged.
+     * Overall results sum the scored answers / assigned activities of matched eligible students only.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> comparison(String surveyId, Map<String, Object> report) {
+        SmartSurveyUpload u = uploads.findById(surveyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Questionnaire upload not found."));
+        Map<String, Map<String, Object>> performance = new LinkedHashMap<>();
+        for (Map<String, Object> row : (List<Map<String, Object>>) report.get("students"))
+            performance.put(String.valueOf(row.get("studentId")), row);
+
+        int[] sAgree = new int[4], sValid = new int[4], aCorrect = new int[4], aTotal = new int[4];
+        int[] measuredStudents = new int[4];
+        List<Map<String, Object>> students = new ArrayList<>();
+        int notEligible = 0;
+        for (SmartSurveyUpload.Row row : u.getRows()) {
+            if (!row.isCounted() || row.getStudentId() == null) continue;
+            Map<String, Object> perf = performance.get(row.getStudentId());
+            if (perf == null) { notEligible++; continue; } // matched account outside the selected cohort
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("studentId", row.getStudentId());
+            out.put("code", perf.get("code"));
+            out.put("name", perf.get("name"));
+            out.put("classCode", perf.get("classCode"));
+            out.put("rowNumber", row.getRowNumber());
+            for (int g = 0; g < 4; g++) {
+                int agree = 0, valid = 0;
+                for (int q = GOAL_GROUP[g] * 2; q <= GOAL_GROUP[g] * 2 + 1 && q < row.getAnswers().size(); q++) {
+                    Boolean a = scale(row.getAnswers().get(q));
+                    if (a == null) continue;
+                    valid++;
+                    if (a) agree++;
+                }
+                Map<String, Object> metric = (Map<String, Object>) perf.get(GOAL_KEYS[g]);
+                boolean measured = "MEASURED".equals(metric.get("status"));
+                Double surveyPct = valid > 0 ? SmartGoalsService.round(agree * 100.0 / valid) : null;
+                Double actualPct = measured ? (Double) metric.get("percentage") : null;
+                Map<String, Object> cell = new LinkedHashMap<>();
+                cell.put("surveyAgree", agree);
+                cell.put("surveyValid", valid);
+                cell.put("surveyPercentage", surveyPct);
+                cell.put("surveyStatus", valid > 0 ? "MEASURED" : "INSUFFICIENT_DATA");
+                cell.put("actualCorrect", metric.get("correct"));
+                cell.put("actualTotal", metric.get("total"));
+                cell.put("actualPercentage", actualPct);
+                cell.put("actualStatus", measured ? "MEASURED" : metric.get("status"));
+                cell.put("difference", surveyPct != null && actualPct != null ? SmartGoalsService.round(actualPct - surveyPct) : null);
+                cell.put("meetsTarget", actualPct == null ? null : actualPct >= GOAL_TARGET[g]);
+                out.put(GOAL_KEYS[g], cell);
+                sAgree[g] += agree; sValid[g] += valid;
+                if (measured) {
+                    aCorrect[g] += ((Number) metric.get("correct")).intValue();
+                    aTotal[g] += ((Number) metric.get("total")).intValue();
+                    measuredStudents[g]++;
+                }
+            }
+            students.add(out);
+        }
+        students.sort(java.util.Comparator.comparing(m -> String.valueOf(m.get("name")).toLowerCase(Locale.ROOT)));
+
+        List<Map<String, Object>> overall = new ArrayList<>();
+        for (int g = 0; g < 4; g++) {
+            Double s = sValid[g] > 0 ? SmartGoalsService.round(sAgree[g] * 100.0 / sValid[g]) : null;
+            Double a = aTotal[g] > 0 ? SmartGoalsService.round(aCorrect[g] * 100.0 / aTotal[g]) : null;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("key", GOAL_KEYS[g]);
+            m.put("target", GOAL_TARGET[g]);
+            m.put("surveyAgree", sAgree[g]);
+            m.put("surveyValid", sValid[g]);
+            m.put("surveyPercentage", s);
+            m.put("actualCorrect", aCorrect[g]);
+            m.put("actualTotal", aTotal[g]);
+            m.put("actualPercentage", a);
+            m.put("actualStatus", a == null ? "INSUFFICIENT_DATA" : a >= GOAL_TARGET[g] ? "ACHIEVED" : "NOT_ACHIEVED");
+            m.put("difference", s != null && a != null ? SmartGoalsService.round(a - s) : null);
+            m.put("studentsWithPerformance", measuredStudents[g]);
+            overall.add(m);
+        }
+        long legacy = u.getRows().stream().filter(r -> "MATCHED".equals(r.getIdentifierStatus()) && r.getStudentId() == null).count();
+        Map<String, Object> flags = new LinkedHashMap<>();
+        flags.put("unmatchedRows", u.getUnmatchedRows());
+        flags.put("noIdentifierRows", u.getNoIdentifierRows());
+        flags.put("duplicateRows", u.getDuplicateRows());
+        flags.put("matchedNotEligible", notEligible);
+        flags.put("legacyMatchedRows", legacy);
+        flags.put("unmatchedRowNumbers", u.getRows().stream().filter(r -> "UNMATCHED".equals(r.getIdentifierStatus())).map(SmartSurveyUpload.Row::getRowNumber).limit(50).toList());
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("surveyId", u.getId());
+        out.put("fileName", u.getFileName());
+        out.put("matchedStudents", students.size());
+        out.put("students", students);
+        out.put("overall", overall);
+        out.put("flags", flags);
         return out;
     }
 

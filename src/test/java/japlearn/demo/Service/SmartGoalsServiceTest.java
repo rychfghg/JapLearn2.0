@@ -135,6 +135,25 @@ class SmartGoalsServiceTest {
         assertThat(q10.get("percentage")).isEqualTo(0.0);
         assertThat(q1.get("statement")).isEqualTo("Q1, statement");
 
+        // Per-student comparison: matched by account, actual vs survey kept separate, missing = insufficient.
+        when(repo.findById("s1")).thenReturn(java.util.Optional.of(u));
+        u.setId("s1");
+        Map<String, Object> perf = new java.util.LinkedHashMap<>(Map.of("studentId", "1", "code", "S-1", "name", "A 1"));
+        perf.put("SMART1", Map.of("correct", 9, "total", 10, "percentage", 90.0, "status", "MEASURED"));
+        perf.put("SMART2", Map.of("correct", 0, "total", 0, "status", "NO_PARTICIPATION"));
+        perf.put("SMART3", Map.of("correct", 3, "total", 5, "percentage", 60.0, "status", "MEASURED"));
+        perf.put("SMART4", Map.of("correct", 0, "total", 0, "status", "NOT_ASSIGNED"));
+        Map<String, Object> cmp = surveys.comparison("s1", Map.of("students", List.of(perf)));
+        Map<String, Object> ana = ((List<Map<String, Object>>) cmp.get("students")).get(0);
+        Map<String, Object> s1 = (Map<String, Object>) ana.get("SMART1");
+        assertThat(s1.get("surveyPercentage")).isEqualTo(100.0);
+        assertThat(s1.get("difference")).isEqualTo(-10.0);
+        assertThat(s1.get("meetsTarget")).isEqualTo(true);
+        assertThat(((Map<String, Object>) ana.get("SMART2")).get("difference")).isNull();
+        assertThat(((Map<String, Object>) ana.get("SMART3")).get("meetsTarget")).isEqualTo(false);
+        assertThat(((Map<String, Object>) ana.get("SMART4")).get("surveyPercentage")).isEqualTo(50.0);
+        assertThat(((Map<String, Object>) cmp.get("flags")).get("unmatchedRows")).isEqualTo(1);
+
         assertThatThrownBy(() -> surveys.upload(new SmartSurveyService.UploadRequest("form.csv", csv.toString(),
                 List.of(0, 1, 4, 5, 6, 7, 8, 9, 10, 11), null, false), "admin")).isInstanceOf(ResponseStatusException.class);
     }
