@@ -76,7 +76,6 @@ public class PortalAuthorizationFilter extends OncePerRequestFilter {
         if (path.equals("/api/users/login") || path.equals("/api/users/register")
                 || path.equals("/api/users/register-teacher") || path.equals("/api/users/forgot-password")
                 || path.equals("/api/users/reset-password") || path.equals("/api/users/confirm")
-                || path.startsWith("/api/users/daily-goal/")
                 // Account deletion: the public page confirms by emailed link and the
                 // in-app button carries the learner's own session token, so neither
                 // is an administrator action.

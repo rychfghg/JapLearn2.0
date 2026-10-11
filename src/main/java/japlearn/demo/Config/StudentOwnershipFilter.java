@@ -54,7 +54,6 @@ public class StudentOwnershipFilter extends OncePerRequestFilter {
     private static final List<Rule> RULES = List.of(
         // ---- writes (saving a student's own data)
         new Rule("POST", Pattern.compile("^/api/scores/(save|high-score)$"), Source.BODY, false),
-        new Rule("POST", Pattern.compile("^/api/users/daily-goal/(minute|complete)$"), Source.BODY, false),
         new Rule("PUT", Pattern.compile("^/api/response-rush/progress$"), Source.QUERY, false),
         new Rule("PUT", Pattern.compile("^/api/dialogue-relay/progress$"), Source.QUERY, false),
         new Rule("DELETE", Pattern.compile("^/api/dialogue-relay/progress$"), Source.QUERY, false),
@@ -77,7 +76,6 @@ public class StudentOwnershipFilter extends OncePerRequestFilter {
         new Rule("GET", Pattern.compile("^/api/reply-coach/(attempts|progress)$"), Source.QUERY, true),
         new Rule("GET", Pattern.compile("^/api/situational/(attempts|best|runs/current|expression-match/progress)$"), Source.QUERY, true),
         new Rule("GET", Pattern.compile("^/api/response-rush/progress$"), Source.QUERY, true),
-        new Rule("GET", Pattern.compile("^/api/users/daily-goal/streak$"), Source.QUERY, true),
         new Rule("GET", Pattern.compile("^/api/students/getStudentByEmail$"), Source.QUERY, true)
     );
 

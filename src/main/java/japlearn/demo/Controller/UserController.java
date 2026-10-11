@@ -265,32 +265,6 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
     }
 }
 
-    @GetMapping("/daily-goal/streak")
-    public ResponseEntity<?> getDailyGoalStreak(@RequestParam String email) {
-        try {
-            return ResponseEntity.ok(japlearnService.getDailyGoalStreak(email));
-        } catch (IllegalArgumentException error) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", error.getMessage()));
-        }
-    }
-
-    @PostMapping("/daily-goal/minute")
-    public ResponseEntity<?> recordDailyGoalMinute(@RequestBody Map<String, String> request) {
-        try {
-            return ResponseEntity.ok(japlearnService.recordDailyGoalMinute(request.get("email")));
-        } catch (IllegalArgumentException error) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", error.getMessage()));
-        }
-    }
-
-    @PostMapping("/daily-goal/complete")
-    public ResponseEntity<?> completeDailyGoal(@RequestBody Map<String, String> request) {
-        try {
-            return ResponseEntity.ok(japlearnService.completeDailyGoal(request.get("email")));
-        } catch (IllegalArgumentException error) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", error.getMessage()));
-        }
-    }
 
     @PostMapping("/register-teacher")
     public ResponseEntity<?> registerTeacher(@RequestBody User user) {

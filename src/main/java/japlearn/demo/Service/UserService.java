@@ -1,9 +1,7 @@
 package japlearn.demo.Service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -200,93 +198,6 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             return userRepository.findByRoleIgnoreCase(role);
         }
 
-        public synchronized Map<String, Object> getDailyGoalStreak(String email) {
-            User user = requireUserByEmail(email);
-            LocalDate today = LocalDate.now(JAPLEARN_TIME_ZONE);
-            resetDailyGoalMinutesIfNewDay(user, today);
-            LocalDate lastCompleted = user.getDailyGoalLastCompletedDate();
-
-            if (lastCompleted != null
-                    && lastCompleted.isBefore(today.minusDays(1))
-                    && user.getDailyGoalStreak() != 0) {
-                user.setDailyGoalStreak(0);
-                userRepository.save(user);
-            }
-
-            return dailyGoalStreakResponse(user, today);
-        }
-
-        public synchronized Map<String, Object> recordDailyGoalMinute(String email) {
-            User user = requireUserByEmail(email);
-            LocalDate today = LocalDate.now(JAPLEARN_TIME_ZONE);
-            resetDailyGoalMinutesIfNewDay(user, today);
-            if (user.getDailyGoalMinutes() < 20) {
-                user.setDailyGoalMinutes(user.getDailyGoalMinutes() + 1);
-                if (user.getDailyGoalMinutes() == 20 && !today.equals(user.getDailyGoalLastCompletedDate())) {
-                    LocalDate lastCompleted = user.getDailyGoalLastCompletedDate();
-                    user.setDailyGoalStreak(today.minusDays(1).equals(lastCompleted)
-                            ? user.getDailyGoalStreak() + 1 : 1);
-                    user.setDailyGoalLastCompletedDate(today);
-                }
-                userRepository.save(user);
-            }
-            return dailyGoalStreakResponse(user, today);
-        }
-
-        private void resetDailyGoalMinutesIfNewDay(User user, LocalDate today) {
-            if (!today.equals(user.getDailyGoalMinutesDate())) {
-                user.setDailyGoalMinutesDate(today);
-                // Preserve a goal completed by the previous client before minutes were stored on the account.
-                user.setDailyGoalMinutes(today.equals(user.getDailyGoalLastCompletedDate()) ? 20 : 0);
-                userRepository.save(user);
-            }
-        }
-
-        public synchronized Map<String, Object> completeDailyGoal(String email) {
-            User user = requireUserByEmail(email);
-            LocalDate today = LocalDate.now(JAPLEARN_TIME_ZONE);
-            LocalDate lastCompleted = user.getDailyGoalLastCompletedDate();
-
-            if (!today.equals(lastCompleted)) {
-                int nextStreak = today.minusDays(1).equals(lastCompleted)
-                        ? user.getDailyGoalStreak() + 1
-                        : 1;
-
-                user.setDailyGoalStreak(nextStreak);
-                user.setDailyGoalLastCompletedDate(today);
-                userRepository.save(user);
-            }
-
-            return dailyGoalStreakResponse(user, today);
-        }
-
-        private User requireUserByEmail(String email) {
-            if (email == null || email.isBlank()) {
-                throw new IllegalArgumentException("Email is required");
-            }
-
-            User user = userRepository.findByEmail(email.trim().toLowerCase());
-            if (user == null) {
-                throw new IllegalArgumentException("User not found");
-            }
-
-            return user;
-        }
-
-        private Map<String, Object> dailyGoalStreakResponse(User user, LocalDate today) {
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("date", today.toString());
-            response.put("minutes", user.getDailyGoalMinutes());
-            response.put("streak", user.getDailyGoalStreak());
-            response.put(
-                    "lastCompletedDate",
-                    user.getDailyGoalLastCompletedDate() == null
-                            ? ""
-                            : user.getDailyGoalLastCompletedDate().toString()
-            );
-            response.put("completedToday", today.equals(user.getDailyGoalLastCompletedDate()));
-            return response;
-        }
 
         public User createManagedUser(Map<String, Object> values) {
             String email = EmailInput.normalize(values.get("email"));

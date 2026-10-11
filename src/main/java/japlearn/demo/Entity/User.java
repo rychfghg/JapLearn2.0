@@ -1,6 +1,5 @@
 package japlearn.demo.Entity;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import org.springframework.data.annotation.Id;
@@ -31,10 +30,6 @@ public class User {
     private String resetToken;
     @JsonIgnore
     private LocalDateTime resetTokenExpiry;
-    private int dailyGoalStreak;
-    private LocalDate dailyGoalLastCompletedDate;
-    private LocalDate dailyGoalMinutesDate;
-    private int dailyGoalMinutes;
     private boolean guidedPhraseEnabled = false;
     // Looked up on every authenticated portal request.
     @Indexed
@@ -84,27 +79,6 @@ public class User {
     public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) {
         this.resetTokenExpiry = resetTokenExpiry;
     }
-
-    public int getDailyGoalStreak() {
-        return dailyGoalStreak;
-    }
-
-    public void setDailyGoalStreak(int dailyGoalStreak) {
-        this.dailyGoalStreak = dailyGoalStreak;
-    }
-
-    public LocalDate getDailyGoalLastCompletedDate() {
-        return dailyGoalLastCompletedDate;
-    }
-
-    public void setDailyGoalLastCompletedDate(LocalDate dailyGoalLastCompletedDate) {
-        this.dailyGoalLastCompletedDate = dailyGoalLastCompletedDate;
-    }
-
-    public LocalDate getDailyGoalMinutesDate() { return dailyGoalMinutesDate; }
-    public void setDailyGoalMinutesDate(LocalDate dailyGoalMinutesDate) { this.dailyGoalMinutesDate = dailyGoalMinutesDate; }
-    public int getDailyGoalMinutes() { return dailyGoalMinutes; }
-    public void setDailyGoalMinutes(int dailyGoalMinutes) { this.dailyGoalMinutes = dailyGoalMinutes; }
 
     public boolean isGuidedPhraseEnabled() { return guidedPhraseEnabled; }
     public void setGuidedPhraseEnabled(boolean guidedPhraseEnabled) { this.guidedPhraseEnabled = guidedPhraseEnabled; }
