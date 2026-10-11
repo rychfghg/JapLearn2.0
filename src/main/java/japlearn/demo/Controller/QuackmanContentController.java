@@ -30,16 +30,24 @@ public class QuackmanContentController {
     }
 
     @PostMapping
-    public ResponseEntity<QuackmanContent> addContent(@RequestBody QuackmanContent content) {
-        QuackmanContent createdContent = service.addContent(content);
-        return ResponseEntity.ok(createdContent);
+    public ResponseEntity<?> addContent(@RequestBody QuackmanContent content) {
+        try {
+            return ResponseEntity.ok(service.addContent(content));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        }
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<QuackmanContent> updateContent(
+    public ResponseEntity<?> updateContent(
             @PathVariable String id, @RequestBody QuackmanContent updatedContent) {
-        QuackmanContent content = service.updateContent(id, updatedContent);
-        return ResponseEntity.ok(content);
+        try {
+            return ResponseEntity.ok(service.updateContent(id, updatedContent));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(java.util.Map.of("error", "That word no longer exists. Refresh the list."));
+        }
     }
 
     @DeleteMapping("/{id}")
