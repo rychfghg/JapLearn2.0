@@ -282,6 +282,21 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
     @org.springframework.beans.factory.annotation.Autowired
     private japlearn.demo.Service.GoogleTokenVerifier googleTokens;
 
+    /** A signed-in student updates their own first and last name. Students only; needs their own session token. */
+    @org.springframework.web.bind.annotation.PutMapping("/me/name")
+    public ResponseEntity<?> updateOwnName(@RequestBody Map<String, Object> body,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Student-Token", required = false) String token) {
+        try {
+            String email = studentAuthorization.requireStudent(body == null ? null : String.valueOf(body.get("email")), token);
+            User user = japlearnService.updateOwnName(email, body.get("fname"), body.get("lname"));
+            return ResponseEntity.ok(Map.of("fname", user.getFname(), "lname", user.getLname()));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(Collections.singletonMap("error", "Please sign in again to change your name."));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
     /** Student sign-in with a Google ID token (from the app or the web Google button). */
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody Map<String, Object> body) {

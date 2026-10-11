@@ -475,6 +475,27 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
         return userRepository.save(user);
     }
 
+    /**
+     * A signed-in student changes only their own first and last name (e.g. a Google account
+     * shows a nickname). Same plain-letters rule as sign-up; nothing else on the account changes.
+     */
+    public User updateOwnName(String email, Object rawFname, Object rawLname) {
+        String fname = TextInput.name(rawFname), lname = TextInput.name(rawLname);
+        if (fname == null || lname == null) throw new IllegalArgumentException(TextInput.NAME_RULE);
+        User user = userRepository.findByEmail(email);
+        if (user == null || !"student".equalsIgnoreCase(user.getRole())) throw new IllegalStateException("Only students can change their name here.");
+        user.setFname(fname);
+        user.setLname(lname);
+        User saved = userRepository.save(user);
+        Student student = studentRepository.findByEmail(saved.getEmail());
+        if (student != null) {
+            student.setFname(fname);
+            student.setLname(lname);
+            studentRepository.save(student);
+        }
+        return saved;
+    }
+
     public User authenticate(String email, String rawPassword) {
         email = EmailInput.normalize(email);
         if (email == null || rawPassword == null || rawPassword.length() > 256) {
