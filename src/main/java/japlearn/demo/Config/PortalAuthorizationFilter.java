@@ -73,7 +73,7 @@ public class PortalAuthorizationFilter extends OncePerRequestFilter {
 
     private boolean isAdminOnly(String method, String path) {
         if (path == null) return false;
-        if (path.equals("/api/users/login") || path.equals("/api/users/register")
+        if (path.equals("/api/users/login") || path.equals("/api/users/google") || path.equals("/api/users/register")
                 || path.equals("/api/users/register-teacher") || path.equals("/api/users/forgot-password")
                 || path.equals("/api/users/reset-password") || path.equals("/api/users/confirm")
                 // Account deletion: the public page confirms by emailed link and the

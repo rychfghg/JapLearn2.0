@@ -129,8 +129,11 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
 
     // Method to reset the password
     public String resetPassword(String token, String newPassword) {
-    if (token == null || token.isBlank() || newPassword == null || newPassword.length() < 8) {
+    if (token == null || token.isBlank()) {
         return "invalid";
+    }
+    if (!TextInput.validPassword(newPassword)) {
+        return "invalid_password";
     }
 
     User user = userRepository.findByResetToken(token);
@@ -204,8 +207,10 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             if (email == null) throw new IllegalArgumentException("Invalid email address");
             if (userRepository.findByEmail(email) != null) throw new IllegalArgumentException("Email already exists");
             User user = new User();
-            user.setFname(String.valueOf(values.get("fname")).trim());
-            user.setLname(String.valueOf(values.get("lname")).trim());
+            String createdFname = TextInput.name(values.get("fname")), createdLname = TextInput.name(values.get("lname"));
+            if (createdFname == null || createdLname == null) throw new IllegalArgumentException(TextInput.NAME_RULE);
+            user.setFname(createdFname);
+            user.setLname(createdLname);
             user.setEmail(email);
             String role = String.valueOf(values.get("role")).trim().toLowerCase();
             // Admin accounts can never be created through the API (only directly in the database).
@@ -213,7 +218,7 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
                 throw new IllegalArgumentException("Invalid account role");
             }
             String password = String.valueOf(values.get("password"));
-            if (password.length() < 8) throw new IllegalArgumentException("Password must be at least 8 characters");
+            if (!TextInput.validPassword(password)) throw new IllegalArgumentException(TextInput.PASSWORD_RULE);
             user.setRole(role);
             user.setPassword(passwordEncoder.encode(password));
             user.setEmailConfirmed(Boolean.TRUE.equals(values.get("emailConfirmed")));
@@ -229,8 +234,16 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             if ("admin".equalsIgnoreCase(user.getRole())) {
                 throw new IllegalArgumentException("Admin accounts cannot be changed here");
             }
-            if (updates.containsKey("fname")) user.setFname(String.valueOf(updates.get("fname")).trim());
-            if (updates.containsKey("lname")) user.setLname(String.valueOf(updates.get("lname")).trim());
+            if (updates.containsKey("fname")) {
+                String fname = TextInput.name(updates.get("fname"));
+                if (fname == null) throw new IllegalArgumentException(TextInput.NAME_RULE);
+                user.setFname(fname);
+            }
+            if (updates.containsKey("lname")) {
+                String lname = TextInput.name(updates.get("lname"));
+                if (lname == null) throw new IllegalArgumentException(TextInput.NAME_RULE);
+                user.setLname(lname);
+            }
             if (updates.containsKey("email")) {
                 String email = EmailInput.normalize(updates.get("email"));
                 if (email == null) throw new IllegalArgumentException("Invalid email address");
@@ -248,7 +261,7 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             if (updates.containsKey("password") && updates.get("password") != null
                     && !String.valueOf(updates.get("password")).isBlank()) {
                 String password = String.valueOf(updates.get("password"));
-                if (password.length() < 8) throw new IllegalArgumentException("Password must be at least 8 characters");
+                if (!TextInput.validPassword(password)) throw new IllegalArgumentException(TextInput.PASSWORD_RULE);
                 user.setPassword(passwordEncoder.encode(password));
                 user.setPortalSessionToken(null);
                 user.setPortalSessionExpiresAt(null);
@@ -277,31 +290,23 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
             userRepository.delete(user);
         }
 
-        // Trims a name and rejects it if empty, longer than 60 characters, or containing markup/control characters.
-        private static String cleanName(String value) {
-            if (value == null) return null;
-            String v = value.trim().replaceAll("\\s+", " ");
-            if (v.isEmpty() || v.length() > 60 || v.matches(".*[<>{}\\[\\]\\\\$`\\p{Cntrl}].*")) return null;
-            return v;
-        }
-
         public String registerUser(User user) {
             try {
                 if (user == null || user.getEmail() == null || user.getPassword() == null) {
                     return "invalid";
                 }
 
-                String email = user.getEmail().trim().toLowerCase();
-                if (email.isBlank() || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+                String email = EmailInput.normalize(user.getEmail());
+                if (email == null) {
                     return "invalid";
                 }
-                if (user.getPassword().length() < 8 || user.getPassword().length() > 128 || email.length() > 254) {
-                    return "invalid";
+                if (!TextInput.validPassword(user.getPassword())) {
+                    return "invalid_password";
                 }
-                // Names: required, short, and plain text only (no tags / control characters).
-                String fname = cleanName(user.getFname()), lname = cleanName(user.getLname());
+                // Names: real letters only (any language); no emojis, numbers, symbols or markup.
+                String fname = TextInput.name(user.getFname()), lname = TextInput.name(user.getLname());
                 if (fname == null || lname == null) {
-                    return "invalid";
+                    return "invalid_name";
                 }
                 user.setFname(fname);
                 user.setLname(lname);
@@ -417,6 +422,58 @@ private void sendPasswordResetEmail(String email, String token, boolean isTeache
         
         
     
+
+    @org.springframework.beans.factory.annotation.Value("${app.registration.allowed-domains:gmail.com,cit.edu}")
+    private String googleAllowedDomains;
+
+    /**
+     * Google sign-in for students only.
+     * 1. Only Gmail / cit.edu Google accounts (same domains as sign-up).
+     * 2. A new Google user becomes a student; approval follows the student auto-approve switch.
+     * 3. An existing student with the same email signs into that same account.
+     * 4. Teacher and admin accounts can never sign in with Google.
+     * Google has already verified the email address, so no confirmation email is needed.
+     */
+    public User googleSignIn(GoogleTokenVerifier.GoogleProfile profile) {
+        String email = EmailInput.normalize(profile == null ? null : profile.email());
+        if (email == null) throw new BadCredentialsException("Invalid Google account");
+        String domain = email.substring(email.indexOf('@') + 1);
+        boolean allowedDomain = java.util.Arrays.stream(googleAllowedDomains.split(","))
+                .map(String::trim).anyMatch(d -> !d.isEmpty() && d.equalsIgnoreCase(domain));
+        if (!allowedDomain) throw new IllegalStateException("Google domain not allowed");
+
+        User user = userRepository.findByEmail(email);
+        if (user != null) {
+            if (!"student".equalsIgnoreCase(user.getRole())) throw new IllegalStateException("Google sign-in students only");
+            if (user.getGoogleId() != null && !user.getGoogleId().equals(profile.subject())) throw new BadCredentialsException("Different Google account");
+            user.setGoogleId(profile.subject());
+            if (!user.isEmailConfirmed()) { user.setEmailConfirmed(true); user.setConfirmationToken(null); }
+        } else {
+            user = new User();
+            user.setEmail(email);
+            user.setRole("student");
+            user.setGoogleId(profile.subject());
+            String fname = TextInput.name(profile.givenName()), lname = TextInput.name(profile.familyName());
+            if (fname == null || lname == null) {
+                String[] parts = String.valueOf(profile.fullName()).trim().split("\\s+", 2);
+                if (fname == null) fname = TextInput.name(parts[0]);
+                if (lname == null && parts.length > 1) lname = TextInput.name(parts[1]);
+            }
+            user.setFname(fname == null ? "JapLearn" : fname);
+            user.setLname(lname == null ? "Learner" : lname);
+            user.setEmailConfirmed(true);
+            user.setApproved(registrationSettings.autoApproveFor("student"));
+            // No usable password: the learner signs in with Google (or sets one with "Forgot password").
+            user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString() + UUID.randomUUID()));
+        }
+        if (!user.isApproved()) { userRepository.save(user); throw new IllegalStateException("User not approved"); }
+        LocalDateTime now = LocalDateTime.now(JAPLEARN_TIME_ZONE);
+        boolean stillValid = user.getPortalSessionToken() != null && user.getPortalSessionExpiresAt() != null
+                && now.isBefore(user.getPortalSessionExpiresAt());
+        if (!stillValid) user.setPortalSessionToken(UUID.randomUUID().toString());
+        user.setPortalSessionExpiresAt(now.plusDays(StudentAuthorizationService.STUDENT_SESSION_DAYS));
+        return userRepository.save(user);
+    }
 
     public User authenticate(String email, String rawPassword) {
         email = EmailInput.normalize(email);

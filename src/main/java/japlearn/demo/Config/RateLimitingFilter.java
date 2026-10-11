@@ -48,6 +48,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         // Classroom sign-ins can share a carrier IP. Repeated failures for
         // one account are capped separately by LoginAttemptLimiter.
         Map.entry("/api/users/login", new int[]{100, 60}),
+        Map.entry("/api/users/google", new int[]{60, 60}),
         Map.entry("/api/students/login", new int[]{100, 60}),
         // A classroom may register ~40 learners behind one public IP.
         // Tightened after a sign-up flood: a classroom can still register over a few

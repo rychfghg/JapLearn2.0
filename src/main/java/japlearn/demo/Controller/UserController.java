@@ -143,6 +143,8 @@ public ResponseEntity<?> resetPassword(@RequestParam("token") String token, @Req
     String result = japlearnService.resetPassword(token, newPassword);
     if ("password_reset".equals(result)) {
         return ResponseEntity.ok(Collections.singletonMap("message", "Password reset successful"));
+    } else if ("invalid_password".equals(result)) {
+        return ResponseEntity.badRequest().body(Collections.singletonMap("error", japlearn.demo.Service.TextInput.PASSWORD_RULE));
     } else {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "Invalid token"));
     }
@@ -256,6 +258,10 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
         // owner can use "Forgot password" if needed.)
         if ("success".equals(result) || "duplicate".equals(result)) {
             return ResponseEntity.status(HttpStatus.CREATED).body(Collections.singletonMap("message", "Registration successful"));
+        } else if ("invalid_name".equals(result)) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", japlearn.demo.Service.TextInput.NAME_RULE));
+        } else if ("invalid_password".equals(result)) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", japlearn.demo.Service.TextInput.PASSWORD_RULE));
         } else {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "Registration failed"));
         }
@@ -272,6 +278,45 @@ public ResponseEntity<?> registerUser(@RequestBody User user) {
         return registerUser(user);
     }
 
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private japlearn.demo.Service.GoogleTokenVerifier googleTokens;
+
+    /** Student sign-in with a Google ID token (from the app or the web Google button). */
+    @PostMapping("/google")
+    public ResponseEntity<?> googleLogin(@RequestBody Map<String, Object> body) {
+        if (!googleTokens.isConfigured()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Collections.singletonMap("error", "Google sign-in is not available yet."));
+        }
+        Object raw = body == null ? null : body.get("idToken");
+        japlearn.demo.Service.GoogleTokenVerifier.GoogleProfile profile = raw instanceof String token ? googleTokens.verify(token) : null;
+        if (profile == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "Google sign-in could not be verified. Please try again."));
+        }
+        try {
+            User user = japlearnService.googleSignIn(profile);
+            Map<String, Object> response = new java.util.LinkedHashMap<>();
+            response.put("id", user.getId());
+            response.put("email", user.getEmail());
+            response.put("fname", user.getFname());
+            response.put("lname", user.getLname());
+            response.put("role", user.getRole());
+            response.put("portalSessionToken", user.getPortalSessionToken());
+            return ResponseEntity.ok(response);
+        } catch (IllegalStateException ex) {
+            String message = switch (String.valueOf(ex.getMessage())) {
+                case "User not approved" -> "User not approved";
+                case "Google domain not allowed" -> "Please use a Gmail account to sign in with Google.";
+                default -> "Google sign-in is for student accounts. Please sign in with your email and password.";
+            };
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Collections.singletonMap("error", message));
+        } catch (BadCredentialsException ex) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.singletonMap("error", "This email is linked to a different Google account."));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.singletonMap("error", "An unexpected error occurred. Please try again."));
+        }
+    }
 
     @PostMapping("/login")
 public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest, jakarta.servlet.http.HttpServletRequest httpRequest) {

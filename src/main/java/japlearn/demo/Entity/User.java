@@ -20,6 +20,10 @@ public class User {
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     private String role;
+    /** Google account id ("sub") once the user has signed in with Google. */
+    private String googleId;
+    public String getGoogleId() { return googleId; }
+    public void setGoogleId(String googleId) { this.googleId = googleId; }
     @JsonIgnore
     private String confirmationToken;
     private boolean isEmailConfirmed = false;
