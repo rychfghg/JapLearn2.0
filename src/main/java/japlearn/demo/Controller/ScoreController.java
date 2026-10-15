@@ -52,7 +52,8 @@ public class ScoreController {
         if (score.getEmail() == null || score.getGame() == null) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(scoreService.saveHighScore(score));
+        try { return ResponseEntity.ok(scoreService.saveHighScore(score)); }
+        catch (IllegalArgumentException invalid) { return ResponseEntity.badRequest().build(); }
     }
 
     @GetMapping("/high-score")

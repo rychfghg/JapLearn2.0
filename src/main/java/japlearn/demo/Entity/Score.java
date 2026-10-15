@@ -14,6 +14,18 @@ import java.time.Instant;
     @CompoundIndex(name = "score_session_sheet", def = "{'gameCode':1,'game':1,'mode':1}")
 })
 public class Score {
+    private int assessmentVersion;
+    private java.util.List<java.util.Map<String,Object>> rushOutcomes = new java.util.ArrayList<>();
+    private java.util.List<java.util.Map<String,Object>> rushFollowups = new java.util.ArrayList<>();
+    private java.util.Map<String,Object> rushMetrics = new java.util.HashMap<>();
+    public int getAssessmentVersion() { return assessmentVersion; }
+    public void setAssessmentVersion(int value) { assessmentVersion=value; }
+    public java.util.List<java.util.Map<String,Object>> getRushOutcomes() { return rushOutcomes; }
+    public void setRushOutcomes(java.util.List<java.util.Map<String,Object>> value) { rushOutcomes=value; }
+    public java.util.List<java.util.Map<String,Object>> getRushFollowups() { return rushFollowups; }
+    public void setRushFollowups(java.util.List<java.util.Map<String,Object>> value) { rushFollowups=value; }
+    public java.util.Map<String,Object> getRushMetrics() { return rushMetrics; }
+    public void setRushMetrics(java.util.Map<String,Object> value) { rushMetrics=value; }
     @Id
     private String id; // MongoDB's default ID
     private String name;

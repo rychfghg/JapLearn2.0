@@ -271,4 +271,24 @@ class SmartGoalsServiceTest {
         assertThat(s4.get("noParticipation")).isEqualTo(1);
     }
 
+
+    @Test
+    void assistedReplyCoachAnswersNeverCountTowardAccuracy() {
+        when(users.findByRoleIgnoreCase("student")).thenReturn(List.of(student("1", "ana@gmail.com")));
+        when(students.findAll()).thenReturn(List.of());
+        when(situational.findAll()).thenReturn(List.of());
+        ReplyCoachAttempt a = new ReplyCoachAttempt();
+        a.setEmail("ana@gmail.com"); a.setChapterId("ch1"); a.setAttemptNumber(1); a.setStartedAt(Instant.parse("2026-09-01T00:00:00Z"));
+        ReplyCoachAttempt.AnswerRecord helped = answer("n2", "BEST");
+        helped.setHelpTypes(new ArrayList<>(List.of("meaning")));
+        a.setAnswers(new ArrayList<>(List.of(answer("n1", "BEST"), helped, answer("n3", "AWKWARD"))));
+        when(coach.findAll()).thenReturn(List.of(a));
+
+        Map<String, Object> report = service.report(new SmartGoalsService.Filters(null, null, null, null, "QUACKRESPONSE", false));
+        Map<String, Object> s2 = goal(report, "SMART2");
+        assertThat(s2.get("correct")).isEqualTo(1);   // only the independent BEST
+        assertThat(s2.get("total")).isEqualTo(2);     // the supported answer is not scored
+        assertThat(((Map<String, Object>) report.get("signals")).get("assistedAnswers")).isEqualTo(1);
+    }
+
 }

@@ -83,6 +83,7 @@ public class SmartGoalsService {
             "Only the first evaluation attempt counts: the earliest completed run of each QuackSituate level/set, the earliest Response Rush and Dialogue Relay runs, the first Reply Coach attempt of each chapter, and the first Talk with Sumi session with per-turn scores, inside the selected period.",
             "QuackSituate games (Ahiru Rescue, Expression Match, Politeness) give one answer per question, so a run's correct/total already reflects the first scored answer of each item. In Reply Coach the first answer recorded for each dialogue node is used.",
             "Reply Coach and Response Rush answers rated BEST or ACCEPTABLE are correct; AWKWARD, IMPOLITE, RUDE and TIMEOUT are scored incorrect.",
+            "Assisted Reply Coach answers (meaning or romaji shown, or a hint used) are recorded separately and never count toward accuracy; only independent first-attempt answers are scored.",
             "Dialogue Relay: 25 dialogue choices plus the spoken bonus prompts, where a bonus counts as correct only when the reply is judged appropriate to the context (not by pronunciation).",
             "Talk with Sumi: each learner turn is one scored response; it is correct when Japanese was attempted and the context score is at least " + SUMI_CONTEXT_PASS + "/100. Pronunciation, accuracy, fluency and completeness scores are never used. Sessions saved before per-turn context scores were recorded are not measurable.",
             "SMART 3 uses QuackSituate Politeness plus Reply Coach questions an admin has explicitly tagged as politeness. Expression Match and Response Rush do not store per-question answers, so their items cannot be tagged and are not counted.",
@@ -242,7 +243,7 @@ public class SmartGoalsService {
         final Map<String, Tally> goals = new LinkedHashMap<>();
         int runsAttempted;
         int runsCompleted;
-        int retries, hints, hintRecords, timeouts, incompleteActivities;
+        int retries, hints, hintRecords, timeouts, incompleteActivities, assistedAnswers;
         int activitiesCompleted;
         final List<Map<String, Object>> activityStatus = new ArrayList<>();
         final Set<String> dates = new TreeSet<>();
@@ -419,6 +420,11 @@ public class SmartGoalsService {
                     for (ReplyCoachAttempt.AnswerRecord ans : a.getAnswers() == null ? List.<ReplyCoachAttempt.AnswerRecord>of() : a.getAnswers()) {
                         if (ans.getNodeId() == null || ans.getEvaluation() == null || ans.getEvaluation().isBlank()) continue;
                         if (!nodes.add(ans.getNodeId())) { excluded.merge("reply coach: repeated answers to the same node", 1, Integer::sum); continue; }
+                        // Assisted answers (meaning/romaji shown or a hint used) are kept separate: they never count as independent accuracy.
+                        if ((ans.getHelpTypes() != null && !ans.getHelpTypes().isEmpty()) || Boolean.TRUE.equals(ans.getHintUsed())) {
+                            row.assistedAnswers++;
+                            continue;
+                        }
                         scored++;
                         boolean good = isGood(ans.getEvaluation());
                         coachEvaluations.merge(upper(ans.getEvaluation()), 1, Integer::sum);
@@ -461,6 +467,8 @@ public class SmartGoalsService {
                 Score first = null;
                 for (Score s : scoresByStudent.getOrDefault(row.email, List.of())) {
                     if (!game[1].equalsIgnoreCase(s.getGame())) continue;
+                    // V2 challenge measures speed; use untimed practice for understanding.
+                    if (ReplyRushEvidence.isTimed(s)) continue;
                     Instant at = scoreTime(s);
                     if (!inPeriod(at, from, to)) continue;
                     row.runsAttempted++;
@@ -486,7 +494,7 @@ public class SmartGoalsService {
                 }
                 else if (game[0].equals("RESPONSE_RUSH")) {
                     ResponseRushProgress open = openRush.get(row.email);
-                    if (open != null && !open.isCompleted() && open.getAnswers() != null && !open.getAnswers().isEmpty()
+                    if (open != null && !ReplyRushEvidence.timedMode(open.getMode()) && !open.isCompleted() && open.getAnswers() != null && !open.getAnswers().isEmpty()
                             && inPeriod(open.getUpdatedAt(), from, to)) {
                         int answered = 0, right = 0;
                         for (Map<String, Object> ans : open.getAnswers()) {
@@ -684,7 +692,7 @@ public class SmartGoalsService {
         out.put("replyCoachEvaluations", coachEvaluations);
         out.put("dropOff", dropOff(stops));
         Map<String, Object> cohortSignals = new LinkedHashMap<>();
-        for (String k : List.of("incorrect", "retries", "hints", "timeouts", "incompleteActivities")) {
+        for (String k : List.of("incorrect", "retries", "assistedAnswers", "hints", "timeouts", "incompleteActivities")) {
             int sum = 0;
             for (Map<String, Object> r : rows) {
                 Object v = ((Map<?, ?>) r.get("signals")).get(k);
@@ -711,6 +719,7 @@ public class SmartGoalsService {
         for (String g : List.of("SMART1", "SMART2", "SMART3")) { Tally t = row.goals.get(g); incorrect += t.total - t.correct; }
         s.put("incorrect", incorrect);
         s.put("retries", row.retries);
+        s.put("assistedAnswers", row.assistedAnswers);
         s.put("hints", row.hintRecords > 0 ? row.hints : null);
         s.put("timeouts", row.timeouts);
         s.put("incompleteActivities", row.incompleteActivities);

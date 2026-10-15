@@ -156,11 +156,16 @@ public class TeacherGamePerformanceController {
                     : item.getTotalQuestions() > 0
                             ? percentage(item.getCorrectAnswers(), item.getTotalQuestions())
                             : clamp(item.getScore());
+            boolean rushTimed=japlearn.demo.Service.ReplyRushEvidence.isTimed(item);
+            if(rushTimed)percent=null; // Do not mix speed trials into understanding averages.
+            String rushSummary=japlearn.demo.Service.ReplyRushEvidence.summary(item);
+            if(rushTimed)activity+=" — Timed challenge (speed)";
+            else if(japlearn.demo.Service.ReplyRushEvidence.isPractice(item))activity+=" — Untimed practice";
             rows.add(new TimedAttempt(time, new AttemptView(item.getId(), game, activity,
                     item.getScore(), item.getMaxScore() > 0 ? item.getMaxScore() : null,
                     percent, time.equals(Instant.EPOCH) ? item.getDate() : time.toString(),
                     item.isCompleted() ? "COMPLETED" : "IN_PROGRESS", item.getMode(),
-                    null, null, null, null, null, null, List.of(), List.of(), null)));
+                    rushSummary, null, null, null, null, null, List.of(), List.of(), null)));
         }
         for (QuackTalkSession item : talk.findByEmailIgnoreCaseOrderByPracticedAtDesc(email)) {
             Instant time = orEpoch(item.getPracticedAt());

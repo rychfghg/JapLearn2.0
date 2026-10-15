@@ -50,6 +50,11 @@ public class ResponseRushProgressController {
         ResponseRushProgress saved = progress.findByEmailIgnoreCase(normalizedEmail)
                 .orElseGet(ResponseRushProgress::new);
         saved.setEmail(normalizedEmail);
+        saved.setSchemaVersion(incoming.getSchemaVersion());
+        saved.setMode(incoming.getMode());
+        saved.setRunId(incoming.getRunId());
+        saved.setPracticeCompleted(saved.isPracticeCompleted() || incoming.isPracticeCompleted());
+        saved.setRushOutcomes(incoming.getRushOutcomes());
         saved.setCurrentNodeId(incoming.getCurrentNodeId());
         saved.setAnswers(incoming.getAnswers());
         saved.setTimeLeft(Math.max(0, incoming.getTimeLeft()));

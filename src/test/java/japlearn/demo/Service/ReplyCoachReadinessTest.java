@@ -27,10 +27,14 @@ class ReplyCoachReadinessTest {
         finish(run, 8); assertThat(service.passed(run)).isTrue();
         assertThat(service.view(attempt).get("ready")).isEqualTo(true);
     }
-    @Test void sevenCorrectAndSupportedPerfectChecksDoNotPass() {
+    @Test void sevenCorrectDoesNotPassAndSupportedAnswersCountAsNotCorrect() {
         var run = service.start(attempt()); finish(run, 7); assertThat(service.passed(run)).isFalse();
-        var supported = service.start(attempt()); service.support(supported, supported.questionIds.get(0), "romaji");
-        finish(supported, 10); assertThat(service.passed(supported)).isFalse();
+        // 10 correct, one with support: 9 independent correct (90%) passes.
+        var oneSupported = service.start(attempt()); service.support(oneSupported, oneSupported.questionIds.get(0), "meaning");
+        finish(oneSupported, 10); assertThat(service.passed(oneSupported)).isTrue();
+        // 8 correct, one of them supported: only 7 independent correct (70%) does not pass.
+        var notEnough = service.start(attempt()); service.support(notEnough, notEnough.questionIds.get(0), "meaning");
+        finish(notEnough, 8); assertThat(service.passed(notEnough)).isFalse();
     }
     @Test void resumeReturnsSameRunAndDoesNotRevealAnswersBeforeCompletion() {
         var attempt = attempt(); var run = service.start(attempt);

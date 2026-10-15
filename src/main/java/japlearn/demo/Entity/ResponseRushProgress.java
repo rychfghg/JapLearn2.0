@@ -11,6 +11,21 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "response_rush_progress")
 public class ResponseRushProgress {
+    private int schemaVersion;
+    private String mode;
+    private String runId;
+    private boolean practiceCompleted;
+    private List<Map<String,Object>> rushOutcomes=new ArrayList<>();
+    public int getSchemaVersion(){return schemaVersion;}
+    public void setSchemaVersion(int value){schemaVersion=value;}
+    public String getMode(){return mode;}
+    public void setMode(String value){mode=value;}
+    public String getRunId(){return runId;}
+    public void setRunId(String value){runId=value;}
+    public boolean isPracticeCompleted(){return practiceCompleted;}
+    public void setPracticeCompleted(boolean value){practiceCompleted=value;}
+    public List<Map<String,Object>> getRushOutcomes(){return rushOutcomes;}
+    public void setRushOutcomes(List<Map<String,Object>> value){rushOutcomes=value==null?new ArrayList<>():value;}
     @Id
     private String id;
     @Indexed(unique = true)

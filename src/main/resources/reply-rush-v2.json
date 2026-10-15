@@ -1,0 +1,202 @@
+{
+  "n_ward_greeting_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "RUDE"
+    },
+    "followup": "すみません。よろしくお願いします。",
+    "alternate": "おい、こっち。"
+  },
+  "n_ward_purpose_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "日本語教室について聞きたいのですが。",
+    "alternate": "何でもいいです。"
+  },
+  "n_ward_understanding_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "すみません、その言葉はどういう意味ですか。",
+    "alternate": "はい、全部分かりました。"
+  },
+  "n_phone_plan_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "RUDE"
+    },
+    "followup": "自宅のインターネットについて相談したいです。",
+    "alternate": "それ、早くして。"
+  },
+  "n_phone_id_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "はい、こちらが会員証です。",
+    "alternate": "たぶんあります。"
+  },
+  "n_phone_fee_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "すみません、送料はいくらですか。",
+    "alternate": "金額は分かりませんが、払います。"
+  },
+  "n_bank_purpose_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "RUDE"
+    },
+    "followup": "荷物を送りたいのですが。",
+    "alternate": "荷物の何かです。"
+  },
+  "n_bank_documents_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "一枚しか持っていません。どうすればいいですか。",
+    "alternate": "はい、二枚ともあります。"
+  },
+  "n_bank_callback_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "すみません、部屋番号は三〇二です。",
+    "alternate": "違います。もういいです。"
+  },
+  "n_conbini_bag_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "袋は要りません。自分の袋があります。",
+    "alternate": "どちらでもいいです。"
+  },
+  "n_conbini_payment_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "クレジットカードで払えますか。",
+    "alternate": "カードだから、使えますよね。"
+  },
+  "n_conbini_receipt_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "はい、レシートをお願いします。",
+    "alternate": "たぶん要るかもしれません。"
+  },
+  "n_conbini_directions_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "すみません、バス停はどこですか。",
+    "alternate": "バス停、教えろ。"
+  },
+  "n_train_pass_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "RUDE"
+    },
+    "followup": "京都までの往復切符をお願いします。",
+    "alternate": "切符なら何でもいいです。"
+  },
+  "n_train_studentId_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "はい、こちらが学生証です。",
+    "alternate": "学生なので、見せなくてもいいです。"
+  },
+  "n_train_wrongPlatform_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "すみません、どこで乗り換えればいいですか。",
+    "alternate": "間違えたので、勝手に降ります。"
+  },
+  "n_interview_introduce_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "アキと申します。よろしくお願いします。",
+    "alternate": "名前は言いたくないです。"
+  },
+  "n_interview_availability_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "土曜日の午後なら手伝えます。",
+    "alternate": "いつでもいいと思います。"
+  },
+  "n_interview_whyHere_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "本を探す人を手伝うのが好きだからです。",
+    "alternate": "どこでも同じだからです。"
+  },
+  "n_interview_clarify_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "ACCEPTABLE",
+      "c": "AWKWARD",
+      "d": "IMPOLITE"
+    },
+    "followup": "すみません、隔週というのはどういう意味ですか。",
+    "alternate": "意味は分かりませんが、大丈夫です。"
+  }
+}

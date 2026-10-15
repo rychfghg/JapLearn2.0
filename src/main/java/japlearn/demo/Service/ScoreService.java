@@ -18,6 +18,11 @@ public class ScoreService {
 
     // Save a score
     public Score saveScore(Score score) {
+        ReplyRushEvidence.normalize(score);
+        if (ReplyRushEvidence.isTimed(score) && scoreRepository.findByEmailIgnoreCaseOrderByDateDesc(score.getEmail()).stream()
+                .noneMatch(s -> ReplyRushEvidence.isPractice(s) && s.isCompleted())) {
+            throw new IllegalArgumentException("Complete untimed practice before the timed challenge.");
+        }
         return scoreRepository.save(score);
     }
 
@@ -26,6 +31,11 @@ public class ScoreService {
             Optional<Score> existing = scoreRepository.findByEmailIgnoreCaseAndClientAttemptId(
                     attempt.getEmail().trim(), attempt.getClientAttemptId());
             if (existing.isPresent()) return existing.get();
+        }
+        ReplyRushEvidence.normalize(attempt);
+        if (ReplyRushEvidence.isTimed(attempt) && scoreRepository.findByEmailIgnoreCaseOrderByDateDesc(attempt.getEmail()).stream()
+                .noneMatch(s -> ReplyRushEvidence.isPractice(s) && s.isCompleted())) {
+            throw new IllegalArgumentException("Complete untimed practice before the timed challenge.");
         }
         // Keep every completed run for averages, completion history, weak-area
         // analysis, and teacher reports. getHighScore still derives the personal
@@ -38,6 +48,13 @@ public class ScoreService {
         attempt.setCorrectAnswers(Math.max(0, attempt.getCorrectAnswers()));
         attempt.setTotalQuestions(Math.max(0, attempt.getTotalQuestions()));
         return scoreRepository.save(attempt);
+    }
+
+    public synchronized Score saveRushReview(String email,String attemptId,List<java.util.Map<String,Object>> answers) {
+        Score score=scoreRepository.findByEmailIgnoreCaseAndClientAttemptId(email.trim(),attemptId)
+            .orElseThrow(()->new IllegalArgumentException("The round must sync before its review."));
+        ReplyRushEvidence.review(score,answers);
+        return scoreRepository.save(score);
     }
 
     public Optional<Score> getHighScore(String email, String game) {

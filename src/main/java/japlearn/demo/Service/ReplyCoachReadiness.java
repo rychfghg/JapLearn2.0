@@ -20,8 +20,9 @@ public class ReplyCoachReadiness {
     }
     public boolean passed(ReadinessRun run) {
         return run.bankVersion == 1 && run.completedAt != null && run.questionIds.size() == 10
-            && run.answers.size() == 10 && run.answers.stream().allMatch(a -> a.helpTypes.isEmpty())
-            && run.answers.stream().filter(a -> a.correct).count() * 100 >= threshold * 10;
+            && run.answers.size() == 10
+            // A supported answer (meaning or romaji shown) is saved as practice and counts as not correct.
+            && run.answers.stream().filter(a -> a.correct && a.helpTypes.isEmpty()).count() * 100 >= threshold * 10;
     }
     public Map<String, Object> policy() {
         return Map.of("thresholdPercent", threshold, "questionCount", 10, "provisional", true,
