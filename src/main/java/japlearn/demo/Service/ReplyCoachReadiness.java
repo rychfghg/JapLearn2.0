@@ -92,7 +92,7 @@ public class ReplyCoachReadiness {
             result.put("question", Map.of("id", q.id(), "skill", q.skill(), "prompt", q.prompt(), "helpTypes", help,
                 "choices", run.optionOrder.get(q.id()).stream().map(id -> {
                     var c = q.choices().stream().filter(o -> o.id().equals(id)).findFirst().orElseThrow();
-                    return Map.of("id", c.id(), "japanese", c.japanese(), "romaji", help.contains("romaji") ? c.romaji() : "",
+                    return Map.of("id", c.id(), "japanese", c.japanese(), "romaji", c.romaji(),
                         "meaning", help.contains("meaning") ? c.meaning() : "");
                 }).toList()));
         } else {
@@ -105,6 +105,7 @@ public class ReplyCoachReadiness {
                 return Map.of("questionId", q.id(), "skill", q.skill(), "prompt", q.prompt(), "correct", a.correct,
                     "supported", !a.helpTypes.isEmpty(), "explanation", q.explanation(),
                     "bestReply", q.choices().stream().filter(c -> c.id().equals(q.correctId())).findFirst().orElseThrow().japanese(),
+                    "bestRomaji", q.choices().stream().filter(c -> c.id().equals(q.correctId())).findFirst().orElseThrow().romaji(),
                     "practiceNumber", q.practiceNumber());
             }).toList());
         }

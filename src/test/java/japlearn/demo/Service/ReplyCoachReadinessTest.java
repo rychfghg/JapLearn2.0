@@ -70,4 +70,12 @@ class ReplyCoachReadinessTest {
         assertThat(new ReplyCoachReadiness(bank, 90).passed(run)).isFalse();
         assertThat(service.policy().get("provisional")).isEqualTo(true);
     }
+    @Test void romajiIsVisibleByDefaultWithoutRecordingOptionalHelp() {
+        var attempt = attempt(); var run = service.start(attempt);
+        Map<?, ?> question = (Map<?, ?>) service.view(attempt).get("question");
+        List<?> choices = (List<?>) question.get("choices");
+        for (Object choice : choices) assertThat((String) ((Map<?, ?>) choice).get("romaji")).isNotBlank();
+        assertThat(run.support).isEmpty();
+        finish(run, 10); assertThat(service.passed(run)).isTrue();
+    }
 }
