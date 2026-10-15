@@ -19,10 +19,6 @@ public class ScoreService {
     // Save a score
     public Score saveScore(Score score) {
         ReplyRushEvidence.normalize(score);
-        if (ReplyRushEvidence.isTimed(score) && scoreRepository.findByEmailIgnoreCaseOrderByDateDesc(score.getEmail()).stream()
-                .noneMatch(s -> ReplyRushEvidence.isPractice(s) && s.isCompleted())) {
-            throw new IllegalArgumentException("Complete untimed practice before the timed challenge.");
-        }
         return scoreRepository.save(score);
     }
 
@@ -33,10 +29,6 @@ public class ScoreService {
             if (existing.isPresent()) return existing.get();
         }
         ReplyRushEvidence.normalize(attempt);
-        if (ReplyRushEvidence.isTimed(attempt) && scoreRepository.findByEmailIgnoreCaseOrderByDateDesc(attempt.getEmail()).stream()
-                .noneMatch(s -> ReplyRushEvidence.isPractice(s) && s.isCompleted())) {
-            throw new IllegalArgumentException("Complete untimed practice before the timed challenge.");
-        }
         // Keep every completed run for averages, completion history, weak-area
         // analysis, and teacher reports. getHighScore still derives the personal
         // best using the repository's score-descending query.

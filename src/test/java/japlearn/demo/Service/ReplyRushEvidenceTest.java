@@ -10,7 +10,7 @@ class ReplyRushEvidenceTest {
         Score score=new Score();score.setGame("QUACKRESPONSE_RUSH");score.setMode(mode);score.setAssessmentVersion(2);
         var bank=new ObjectMapper().readTree(getClass().getResourceAsStream("/reply-rush-v2.json"));
         List<Map<String,Object>> events=new ArrayList<>();
-        bank.fieldNames().forEachRemaining(id->events.add(new HashMap<>(Map.of("nodeId",id,"outcome","CORRECT","choiceId","a","timingEligible",true,"responseMs",1500))));
+        bank.fieldNames().forEachRemaining(id->{if(!id.startsWith("n_practice_library_"))events.add(new HashMap<>(Map.of("nodeId",id,"outcome","CORRECT","choiceId","a","timingEligible",true,"responseMs",1500)));});
         score.setRushOutcomes(events);return score;
     }
     @Test void practiceNeverProducesSpeedAndCorrectnessIsServerDerived()throws Exception {
@@ -47,5 +47,14 @@ class ReplyRushEvidenceTest {
     }
     @Test void legacyResultsAreNotRelabeled() {
         var score=new Score();score.setGame("QUACKRESPONSE_RUSH");score.setScore(12);ReplyRushEvidence.normalize(score);assertEquals(12,score.getScore());assertFalse(ReplyRushEvidence.isTimed(score));
+    }
+    @Test void shortPracticeHasFourQuestionsAndCannotMixInTimedQuestions()throws Exception {
+        var shortRun=round("RUSH_PRACTICE_SHORT_V3");shortRun.setAssessmentVersion(3);
+        List<Map<String,Object>> answers=new ArrayList<>();
+        for(String skill:List.of("greet","purpose","clarify","confirm"))answers.add(new HashMap<>(Map.of("nodeId","n_practice_library_"+skill+"_choice","choiceId","a","outcome","CORRECT")));
+        shortRun.setRushOutcomes(answers);ReplyRushEvidence.normalize(shortRun);
+        assertEquals(4,shortRun.getTotalQuestions());assertEquals(4,shortRun.getCorrectAnswers());assertNull(shortRun.getRushMetrics().get("meanResponseMs"));
+        shortRun.getRushOutcomes().add(Map.of("nodeId","n_ward_greeting_choice","choiceId","a","outcome","CORRECT"));
+        assertThrows(IllegalArgumentException.class,()->ReplyRushEvidence.normalize(shortRun));
     }
 }

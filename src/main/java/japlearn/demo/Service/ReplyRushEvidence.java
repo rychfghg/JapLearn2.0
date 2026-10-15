@@ -14,18 +14,20 @@ public final class ReplyRushEvidence {
         } catch(Exception e) { throw new ExceptionInInitializerError(e); }
     }
     public static boolean isTimed(Score score) { return "RUSH_TIMED_V2".equals(score.getMode()); }
-    public static boolean isPractice(Score score) { return "RUSH_PRACTICE_V2".equals(score.getMode()); }
+    public static boolean isPractice(Score score) { return "QUACKRESPONSE_RUSH".equalsIgnoreCase(score.getGame())&&("RUSH_PRACTICE_V2".equals(score.getMode())||"RUSH_PRACTICE_SHORT_V3".equals(score.getMode())); }
     public static boolean timedMode(String mode) { return "RUSH_TIMED_V2".equals(mode)||"TIMED".equals(mode); }
     public static String summary(Score score) {
-        if(score.getAssessmentVersion()!=2||!"QUACKRESPONSE_RUSH".equalsIgnoreCase(score.getGame()))return null;
+        if(score.getAssessmentVersion()<2||!"QUACKRESPONSE_RUSH".equalsIgnoreCase(score.getGame()))return null;
         var m=score.getRushMetrics();
         return "Answered accuracy (timeouts excluded): "+(m.get("answeredAccuracy")==null?"not assessed":m.get("answeredAccuracy")+"%")
             +"; incorrect: "+m.get("incorrect")+"; timeouts: "+m.get("timeouts")+"; technical interruptions: "+m.get("technicalInterruptions")
             +"; mean eligible response: "+(m.get("meanResponseMs")==null?"no speed sample":m.get("meanResponseMs")+" ms")+". Practice and speed are separate measurements.";
     }
     public static void normalize(Score score) {
-        if(!"QUACKRESPONSE_RUSH".equalsIgnoreCase(score.getGame())||score.getAssessmentVersion()!=2)return;
+        if(!"QUACKRESPONSE_RUSH".equalsIgnoreCase(score.getGame())||score.getAssessmentVersion()<2)return;
         if(!isTimed(score)&&!isPractice(score))throw new IllegalArgumentException("Choose practice or timed challenge.");
+        boolean shortPractice="RUSH_PRACTICE_SHORT_V3".equals(score.getMode());
+        if(shortPractice&&score.getAssessmentVersion()!=3)throw new IllegalArgumentException("Short practice requires version 3.");
         var incoming=score.getRushOutcomes();
         if(incoming==null||incoming.size()>250)throw new IllegalArgumentException("Invalid round evidence.");
         Set<String> terminals=new HashSet<>();List<Map<String,Object>> canonical=new ArrayList<>();
@@ -35,6 +37,7 @@ public final class ReplyRushEvidence {
         for(var item:incoming) {
             String node=String.valueOf(item.get("nodeId")),kind=String.valueOf(item.get("outcome"));
             JsonNode question=BANK.get(node);if(question==null)throw new IllegalArgumentException("Unknown question.");
+            if(node.startsWith("n_practice_library_")!=shortPractice)throw new IllegalArgumentException("Question does not belong to this mode.");
             Map<String,Object> row=new LinkedHashMap<>();row.put("nodeId",node);
             if("TECHNICAL_INTERRUPTION".equals(kind)) {
                 interruptions++;row.put("outcome",kind);row.put("reason",String.valueOf(item.getOrDefault("reason","Interrupted")));
@@ -56,7 +59,7 @@ public final class ReplyRushEvidence {
             }
             canonical.add(row);
         }
-        if(score.isCompleted()&&terminals.size()!=BANK.size())throw new IllegalArgumentException("Complete every question before saving the round.");
+        if(score.isCompleted()&&terminals.size()!=(shortPractice?4:20))throw new IllegalArgumentException("Complete every question before saving the round.");
         Map<String,Object> stats=new LinkedHashMap<>();stats.put("correct",correct);stats.put("incorrect",incorrect);stats.put("timeouts",timeouts);stats.put("technicalInterruptions",interruptions);
         stats.put("answered",correct+incorrect);stats.put("answeredAccuracy",correct+incorrect==0?null:Math.round(correct*100.0/(correct+incorrect)));
         stats.put("meanResponseMs",speedSamples==0?null:Math.round((double)speed/speedSamples));stats.put("speedSamples",speedSamples);
@@ -65,7 +68,7 @@ public final class ReplyRushEvidence {
         score.setRushFollowups(new ArrayList<>());
     }
     public static void review(Score score,List<Map<String,Object>> answers) {
-        if(score.getAssessmentVersion()!=2||!score.isCompleted()||answers==null||answers.size()>20)throw new IllegalArgumentException("A completed V2 round is required.");
+        if(score.getAssessmentVersion()<2||!score.isCompleted()||answers==null||answers.size()>20)throw new IllegalArgumentException("A completed practice or timed round is required.");
         Set<String> missed=new HashSet<>();for(var e:score.getRushOutcomes())if(!"CORRECT".equals(e.get("outcome")))missed.add(String.valueOf(e.get("nodeId")));
         var stored=score.getRushFollowups()==null?new ArrayList<Map<String,Object>>():new ArrayList<>(score.getRushFollowups());
         for(var answer:answers){String node=String.valueOf(answer.get("nodeId")),selected=String.valueOf(answer.get("selectedJapanese"));JsonNode q=BANK.get(node);

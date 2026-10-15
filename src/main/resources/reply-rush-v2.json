@@ -198,5 +198,37 @@
     },
     "followup": "すみません、隔週というのはどういう意味ですか。",
     "alternate": "意味は分かりませんが、大丈夫です。"
+  },
+  "n_practice_library_greet_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "IMPOLITE"
+    },
+    "followup": "おはようございます。よろしくお願いします。",
+    "alternate": "おい、早くして。"
+  },
+  "n_practice_library_purpose_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "AWKWARD"
+    },
+    "followup": "日本語の授業に参加したいです。",
+    "alternate": "何でもいいと思います。"
+  },
+  "n_practice_library_clarify_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "AWKWARD"
+    },
+    "followup": "すみません、予約とは何ですか。",
+    "alternate": "全部分かるので、説明は要りません。"
+  },
+  "n_practice_library_confirm_choice": {
+    "choices": {
+      "a": "BEST",
+      "b": "AWKWARD"
+    },
+    "followup": "はい、予約のメールはこちらです。",
+    "alternate": "メールはどこかにあると思います。"
   }
 }
