@@ -3,6 +3,8 @@ package japlearn.demo.Entity;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -30,8 +32,58 @@ public class ReplyCoachAttempt {
     private Instant updatedAt = Instant.now();
     private Instant completedAt;
     private List<AnswerRecord> answers = new ArrayList<>();
+    private List<ReadinessRun> readinessRuns = new ArrayList<>();
+    private List<PracticeResult> practiceResults = new ArrayList<>();
+    public List<ReadinessRun> getReadinessRuns() {
+        if (readinessRuns == null) readinessRuns = new ArrayList<>();
+        return readinessRuns;
+    }
+    public void setReadinessRuns(List<ReadinessRun> value) { readinessRuns = value; }
+    public List<PracticeResult> getPracticeResults() {
+        if (practiceResults == null) practiceResults = new ArrayList<>();
+        return practiceResults;
+    }
+    public void setPracticeResults(List<PracticeResult> value) { practiceResults = value; }
+    public static class ReadinessRun {
+        public String id;
+        public int bankVersion = 1;
+        public Instant startedAt = Instant.now();
+        public Instant completedAt;
+        public List<String> questionIds = new ArrayList<>();
+        public Map<String, List<String>> optionOrder = new LinkedHashMap<>();
+        public Map<String, List<String>> support = new LinkedHashMap<>();
+        public List<ReadinessAnswer> answers = new ArrayList<>();
+    }
+    public static class ReadinessAnswer {
+        public String questionId;
+        public String choiceId;
+        public String skill;
+        public boolean correct;
+        public List<String> helpTypes = new ArrayList<>();
+        public Instant answeredAt = Instant.now();
+    }
+    public static class PracticeResult {
+        public String key;
+        public String questionId;
+        public boolean correct;
+        public List<String> helpTypes = new ArrayList<>();
+        public Instant answeredAt = Instant.now();
+    }
+    private Map<String, List<String>> supportUsage = new LinkedHashMap<>();
+    public Map<String, List<String>> getSupportUsage() {
+        if (supportUsage == null) supportUsage = new LinkedHashMap<>();
+        return supportUsage;
+    }
+    public void setSupportUsage(Map<String, List<String>> supportUsage) { this.supportUsage = supportUsage; }
 
     public static class AnswerRecord {
+        // Nullable for legacy answers: unknown is never presented as independent mastery.
+        private List<String> helpTypes;
+        private Boolean supported;
+        public List<String> getHelpTypes() { return helpTypes; }
+        public void setHelpTypes(List<String> helpTypes) { this.helpTypes = helpTypes; }
+        public Boolean getSupported() { return supported; }
+        public void setSupported(Boolean supported) { this.supported = supported; }
         private String nodeId;
         private String prompt;
         private String choiceId;

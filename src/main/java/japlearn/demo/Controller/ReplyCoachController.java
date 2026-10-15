@@ -41,6 +41,9 @@ import japlearn.demo.Repository.ReplyCoachChapterRepository;
 @RestController
 @RequestMapping("/api/reply-coach")
 public class ReplyCoachController {
+    @org.springframework.beans.factory.annotation.Autowired
+    private japlearn.demo.Service.ReplyCoachReadiness readiness;
+    private static final Set<String> HELP_TYPES = Set.of("hint", "replay", "dialogueReview", "romaji", "meaning", "choiceAudio");
     private final ReplyCoachChapterRepository chapters;
     private final ReplyCoachAttemptRepository attempts;
     private final GridFsTemplate gridFsTemplate;
@@ -184,7 +187,7 @@ public class ReplyCoachController {
     }
 
     @PutMapping("/attempts/{id}/progress")
-    public ResponseEntity<ReplyCoachAttempt> progress(
+    public synchronized ResponseEntity<ReplyCoachAttempt> progress(
             @PathVariable String id,
             @RequestBody Map<String, Object> request) {
         ReplyCoachAttempt attempt = attempts.findById(id).orElse(null);
@@ -193,12 +196,22 @@ public class ReplyCoachController {
         }
         Object currentNodeId = request.get("currentNodeId");
         if (currentNodeId != null) attempt.setCurrentNodeId(String.valueOf(currentNodeId));
+        String supportNodeId = String.valueOf(request.getOrDefault("supportNodeId", ""));
+        String helpType = String.valueOf(request.getOrDefault("helpType", ""));
+        if (!supportNodeId.isBlank() && HELP_TYPES.contains(helpType)) {
+            ReplyCoachChapter chapter = chapters.findById(attempt.getChapterId()).orElse(null);
+            if (chapter != null && chapter.getNodes().stream().anyMatch(node -> supportNodeId.equals(node.getId()) && "CHOICE".equals(node.getType()))
+                    && attempt.getAnswers().stream().noneMatch(answer -> supportNodeId.equals(answer.getNodeId()))) {
+                List<String> used = attempt.getSupportUsage().computeIfAbsent(supportNodeId, key -> new ArrayList<>());
+                if (!used.contains(helpType)) used.add(helpType);
+            }
+        }
         attempt.setUpdatedAt(Instant.now());
         return ResponseEntity.ok(attempts.save(attempt));
     }
 
     @PostMapping("/attempts/{id}/answer")
-    public ResponseEntity<?> answer(
+    public synchronized ResponseEntity<?> answer(
             @PathVariable String id,
             @RequestBody Map<String, String> request) {
         ReplyCoachAttempt attempt = attempts.findById(id).orElse(null);
@@ -235,6 +248,15 @@ public class ReplyCoachController {
         record.setEvaluation(choice.getEvaluation());
         boolean hintUsed = Boolean.parseBoolean(request.getOrDefault("hintUsed", "false"));
         record.setHintUsed(hintUsed);
+        Set<String> usedHelp = new java.util.TreeSet<>(attempt.getSupportUsage().getOrDefault(nodeId, List.of()));
+        for (String help : request.getOrDefault("helpTypes", "").split(",")) {
+            if (HELP_TYPES.contains(help)) usedHelp.add(help);
+        }
+        if (hintUsed) usedHelp.add("hint");
+        if ("1".equals(request.get("supportTrackingVersion"))) {
+            record.setHelpTypes(new ArrayList<>(usedHelp));
+            record.setSupported(!usedHelp.isEmpty());
+        }
         int earnedPoints = Math.max(0, choice.getPoints() - (hintUsed ? node.getHintPenalty() : 0));
         record.setPoints(earnedPoints);
         record.setExplanation(choice.getExplanation());
@@ -298,6 +320,14 @@ public class ReplyCoachController {
         result.put("impoliteOrRudeResponses", completed.stream()
                 .mapToInt(item -> item.getImpoliteCount() + item.getRudeCount()).sum());
         result.put("recentAttempts", completed.stream().limit(5).toList());
+        List<ReplyCoachAttempt.AnswerRecord> tracked = completed.stream()
+                .flatMap(attempt -> attempt.getAnswers().stream()).filter(answer -> answer.getSupported() != null).toList();
+        result.put("independentAnswers", tracked.stream().filter(answer -> Boolean.FALSE.equals(answer.getSupported())).count());
+        result.put("independentAppropriateAnswers", tracked.stream().filter(answer -> Boolean.FALSE.equals(answer.getSupported())
+                && Set.of("BEST", "ACCEPTABLE").contains(answer.getEvaluation())).count());
+        result.put("supportedAnswers", tracked.stream().filter(answer -> Boolean.TRUE.equals(answer.getSupported())).count());
+        result.put("readinessReady", readiness != null && completed.stream().flatMap(a -> a.getReadinessRuns().stream()).anyMatch(readiness::passed));
+        result.put("readinessPolicy", readiness == null ? Map.of() : readiness.policy());
         return result;
     }
 
