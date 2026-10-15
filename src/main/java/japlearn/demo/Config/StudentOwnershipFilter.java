@@ -62,8 +62,10 @@ public class StudentOwnershipFilter extends OncePerRequestFilter {
         new Rule("POST", Pattern.compile("^/api/reply-coach/attempts/start$"), Source.BODY, false),
         new Rule("POST", Pattern.compile("^/api/quackTalkSessions/record$"), Source.BODY, false),
         new Rule("POST", Pattern.compile("^/api/progress/([^/]+)$"), Source.PATH, false),
-        new Rule("POST", Pattern.compile("^/api/talk-with-sumi/(live-token|complete|reserve-response)$"), Source.BODY, false),
+        new Rule("POST", Pattern.compile("^/api/talk-with-sumi/(live-token|complete|reserve-response|release-response)$"), Source.BODY, false),
+        new Rule("POST", Pattern.compile("^/api/talk-with-sumi/assess$"), Source.QUERY, false),
         new Rule("POST", Pattern.compile("^/api/guided-phrase/(live-token|complete)$"), Source.BODY, false),
+        new Rule("POST", Pattern.compile("^/api/guided-phrase/assess$"), Source.QUERY, false),
         new Rule("POST", Pattern.compile("^/api/dialogue-relay/bonus/assess$"), Source.QUERY, false),
         new Rule("POST", Pattern.compile("^/api/students/joinClass$"), Source.QUERY, false),
         // ---- reads (a student's scores, progress, history, analytics)

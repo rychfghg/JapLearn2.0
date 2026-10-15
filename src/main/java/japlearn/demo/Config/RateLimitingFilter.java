@@ -70,7 +70,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         Map.entry("/api/guided-phrase/assess", new int[]{10, 60}),
         Map.entry("/api/talk-with-sumi/live-token", new int[]{10, 60}),
         Map.entry("/api/talk-with-sumi/assess", new int[]{10, 60}),
-        Map.entry("/api/talk-with-sumi/reserve-response", new int[]{15, 60})
+        Map.entry("/api/talk-with-sumi/reserve-response", new int[]{15, 60}),
+        Map.entry("/api/talk-with-sumi/release-response", new int[]{10, 60})
     );
 
     // Keep ordinary gameplay and queued offline-score synchronization usable

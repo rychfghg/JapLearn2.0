@@ -90,9 +90,16 @@ public class QuackProgressController {
         replies.stream().filter(item -> "COMPLETED".equalsIgnoreCase(item.getStatus())).limit(8)
                 .forEach(item -> history.add(history("Reply Coach · " + item.getChapterTitle(), item.getFinalPercentage())));
         talk.stream().filter(QuackTalkSession::isEvaluated).filter(item -> item.getScore() != null).limit(12)
-                .forEach(item -> history.add(history(
-                        "GUIDED_PHRASE".equalsIgnoreCase(item.getRoomType()) ? "QuackTalk · Guided Phrase" : "QuackTalk · Talk with Sumi",
-                        item.getScore())));
+                .forEach(item -> {
+                    if ("TALK_WITH_SUMI".equalsIgnoreCase(item.getRoomType())) {
+                        // Reported separately: response fit (context) counts for conversational accuracy; pronunciation does not.
+                        if (item.getContextualAccuracy() != null) history.add(history("QuackTalk · Talk with Sumi · Response fit", item.getContextualAccuracy()));
+                        if (item.getPronunciationScore() != null) history.add(history("QuackTalk · Talk with Sumi · Pronunciation", item.getPronunciationScore()));
+                    } else {
+                        if (item.getContextualAccuracy() != null) history.add(history("QuackTalk · Guided Phrase · Response fit", item.getContextualAccuracy()));
+                        if (item.getPronunciationScore() != null) history.add(history("QuackTalk · Guided Phrase · Pronunciation", item.getPronunciationScore()));
+                    }
+                });
         arcade.stream().filter(this::isPersonalProgressScore).limit(12)
                 .forEach(item -> history.add(history(displayGame(item.getGame()), scorePercent(item))));
 
