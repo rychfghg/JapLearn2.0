@@ -46,7 +46,10 @@ public class ReplyCoachChapterSeeder {
                     && chapter.getNodes() != null
                     && chapter.getNodes().stream()
                             .anyMatch(node -> "dialogue-1-companion".equals(node.getId()));
-            if (currentStoryVersion) return;
+            if (currentStoryVersion) {
+                if (ReplyCoachContentRevision.apply(chapter)) repository.save(chapter);
+                return;
+            }
 
             chapter.setTitle("A Day of First Impressions");
             chapter.setDescription("Join Sumi and Haru for a connected first-day journey through Tokyo while learning natural replies, etiquette, and respectful behavior.");
@@ -240,6 +243,7 @@ public class ReplyCoachChapterSeeder {
             nodes.add(node("ending", "ENDING", "Reply Coach Complete", "Your first-day journey is complete.", "station-night", null, false));
 
             chapter.setNodes(nodes);
+            ReplyCoachContentRevision.apply(chapter);
             repository.save(chapter);
         };
     }
