@@ -125,11 +125,14 @@ public class SituationalQuestionController {
                 || attempt.getGameType() == null || attempt.getGameType().isBlank()) {
             return ResponseEntity.badRequest().build();
         }
+        String keepId = null;
         if (attempt.getClientAttemptId() != null && !attempt.getClientAttemptId().isBlank()) {
             var existing = attempts.findByEmailIgnoreCaseAndClientAttemptId(attempt.getEmail(), attempt.getClientAttemptId());
-            if (existing.isPresent()) return ResponseEntity.ok(existing.get());
+            // A finished run is immutable; an unfinished one (Politeness leave/resume) is updated in place.
+            if (existing.isPresent() && existing.get().isCompleted()) return ResponseEntity.ok(existing.get());
+            if (existing.isPresent()) keepId = existing.get().getId();
         }
-        attempt.setId(null);
+        attempt.setId(keepId);
         attempt.setCompletedAt(Instant.now());
         attempt.setWrongAnswers(Math.max(0, attempt.getTotalQuestions() - attempt.getCorrectAnswers()));
         attempt.setAccuracy(attempt.getTotalQuestions() == 0 ? 0
