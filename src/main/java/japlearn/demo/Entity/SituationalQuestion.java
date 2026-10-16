@@ -8,6 +8,12 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "situational_question_bank")
 public class SituationalQuestion {
+    private String relationship;
+    private String learnerRole;
+    public String getRelationship() { return relationship; }
+    public void setRelationship(String value) { relationship = value; }
+    public String getLearnerRole() { return learnerRole; }
+    public void setLearnerRole(String value) { learnerRole = value; }
     @Id
     private String id;
     private String gameType;
@@ -87,6 +93,12 @@ public class SituationalQuestion {
     public void setActive(boolean active) { this.active = active; }
 
     public static class ResponseChoice {
+        private String feedback;
+        private Boolean acceptable;
+        public String getFeedback() { return feedback; }
+        public void setFeedback(String value) { feedback = value; }
+        public Boolean getAcceptable() { return acceptable; }
+        public void setAcceptable(Boolean value) { acceptable = value; }
         private String japanese;
         private String romaji;
 

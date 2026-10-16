@@ -135,6 +135,10 @@ public class SituationalQuestionController {
         attempt.setAccuracy(attempt.getTotalQuestions() == 0 ? 0
                 : Math.round((attempt.getCorrectAnswers() * 10000.0) / attempt.getTotalQuestions()) / 100.0);
         normalizeRecognitionScore(attempt);
+        if ("EXPRESSION_MATCH".equalsIgnoreCase(attempt.getGameType())) {
+            try { japlearn.demo.Service.ExpressionMatchEvidence.normalize(attempt); }
+            catch (IllegalArgumentException invalid) { return ResponseEntity.badRequest().build(); }
+        }
         return ResponseEntity.ok(attempts.save(attempt));
     }
 
@@ -225,6 +229,7 @@ public class SituationalQuestionController {
         result.put("bestAccuracy", round(records.stream().mapToDouble(SituationalAttempt::getAccuracy).max().orElse(0)));
         result.put("averageAccuracy", round(records.stream().mapToDouble(SituationalAttempt::getAccuracy).average().orElse(0)));
         result.put("attempts", records.size());
+        result.put("expressionBreakdown", japlearn.demo.Service.ExpressionMatchEvidence.breakdown(records));
         return result;
     }
 

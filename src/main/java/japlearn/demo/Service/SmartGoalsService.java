@@ -349,8 +349,9 @@ public class SmartGoalsService {
             }
             Map<String, int[]> unfinished = new LinkedHashMap<>(); // key -> {correct, answered}
             Map<String, Instant> unfinishedAt = new java.util.HashMap<>();
-            for (SituationalAttempt a : partials.values()) { // Politeness saves a partial result when the learner leaves
-                String key = "POLITENESS|" + a.getLevel();
+            for (SituationalAttempt a : partials.values()) { // Politeness partial saves and Ahiru Rescue game-over runs
+                String partialType = upper(a.getGameType());
+                String key = partialType.equals("RECOGNITION") ? "RECOGNITION|0" : partialType + "|" + a.getLevel();
                 int answered = answeredIn(a);
                 if (finished.contains(key) || answered <= 0) continue;
                 unfinished.put(key, new int[] { Math.min(a.getCorrectAnswers(), answered), answered });

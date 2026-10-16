@@ -18,6 +18,15 @@ public class SituationalRun {
     private int easyMistakes;
     private int hardMistakes;
     private int hintsUsed;
+    private Integer expressionMatchVersion;
+    private java.util.List<String> questionIds;
+    private java.util.List<ExpressionQuestionResult> questionResults;
+    public Integer getExpressionMatchVersion() { return expressionMatchVersion; }
+    public void setExpressionMatchVersion(Integer value) { expressionMatchVersion = value; }
+    public java.util.List<String> getQuestionIds() { return questionIds; }
+    public void setQuestionIds(java.util.List<String> value) { questionIds = value; }
+    public java.util.List<ExpressionQuestionResult> getQuestionResults() { return questionResults; }
+    public void setQuestionResults(java.util.List<ExpressionQuestionResult> value) { questionResults = value; }
     private Instant updatedAt = Instant.now();
 
     public String getId() { return id; }

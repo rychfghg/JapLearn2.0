@@ -95,6 +95,22 @@ class SmartGoalsServiceTest {
         assertThat(s4.get("incomplete")).isEqualTo(2);
     }
 
+    @Test
+    void ahiruRescueGameOverCountsAsUnfinishedRescueRunNotPoliteness() {
+        when(users.findByRoleIgnoreCase("student")).thenReturn(List.of(student("1", "ana@gmail.com")));
+        when(students.findAll()).thenReturn(List.of());
+        SituationalAttempt lost = run("ana@gmail.com", "RECOGNITION", 5, 25, false, "2026-09-01T00:00:00Z");
+        lost.setAnsweredCount(11); lost.setEndReason("GAME_OVER");
+        when(situational.findAll()).thenReturn(List.of(lost));
+        when(coach.findAll()).thenReturn(List.of());
+
+        Map<String, Object> report = service.report(new SmartGoalsService.Filters(null, null, null, null, null, false));
+        Map<String, Object> s1 = goal(report, "SMART1");
+        assertThat(s1.get("correct")).isEqualTo(5);
+        assertThat(s1.get("total")).isEqualTo(11);
+        assertThat(goal(report, "SMART3").get("total")).isIn(0, null);
+    }
+
     private Map<String, Object> goal(Map<String, Object> report, String key) {
         return ((List<Map<String, Object>>) report.get("goals")).stream().filter(g -> key.equals(g.get("key"))).findFirst().orElseThrow();
     }

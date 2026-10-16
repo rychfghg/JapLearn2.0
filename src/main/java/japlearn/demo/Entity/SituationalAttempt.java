@@ -17,10 +17,28 @@ public class SituationalAttempt {
     private int maxScore;
     private int totalQuestions;
     private int correctAnswers;
+    private java.util.List<ExpressionQuestionResult> questionResults;
+    private java.util.List<PolitenessQuestionResult> politenessResponses;
+    public java.util.List<PolitenessQuestionResult> getPolitenessResponses() { return politenessResponses; }
+    public void setPolitenessResponses(java.util.List<PolitenessQuestionResult> value) { politenessResponses = value; }
+    public java.util.List<ExpressionQuestionResult> getQuestionResults() { return questionResults; }
+    public void setQuestionResults(java.util.List<ExpressionQuestionResult> value) { questionResults = value; }
     /** Hints opened during the run (sent by Ahiru Rescue from this version on; null on older runs). */
     private Integer hintsUsed;
     /** Questions answered when a run was left unfinished (Politeness partial saves, from this version on). */
     private Integer answeredCount;
+    /** Per-question first answers (questionId, order, difficulty, skill, selected, correct, hintUsed); null on older runs. */
+    private java.util.List<java.util.Map<String, Object>> answers;
+    /** Untimed transfer practice after a mistake; recorded separately and never scored. */
+    private java.util.List<java.util.Map<String, Object>> skillReviews;
+    /** CLEARED or GAME_OVER for Ahiru Rescue; null on older runs. */
+    private String endReason;
+    public java.util.List<java.util.Map<String, Object>> getAnswers() { return answers; }
+    public void setAnswers(java.util.List<java.util.Map<String, Object>> answers) { this.answers = answers; }
+    public java.util.List<java.util.Map<String, Object>> getSkillReviews() { return skillReviews; }
+    public void setSkillReviews(java.util.List<java.util.Map<String, Object>> skillReviews) { this.skillReviews = skillReviews; }
+    public String getEndReason() { return endReason; }
+    public void setEndReason(String endReason) { this.endReason = endReason; }
     public Integer getAnsweredCount() { return answeredCount; }
     public void setAnsweredCount(Integer answeredCount) { this.answeredCount = answeredCount; }
     public Integer getHintsUsed() { return hintsUsed; }
