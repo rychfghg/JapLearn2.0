@@ -173,7 +173,14 @@ public class ReplyCoachController {
                         email,
                         chapterId,
                         "IN_PROGRESS");
-        if (resumable.isPresent()) return ResponseEntity.ok(resumable.get());
+        boolean restart = Boolean.parseBoolean(request.getOrDefault("restart", "false"));
+        if (resumable.isPresent() && !restart) return ResponseEntity.ok(resumable.get());
+        if (resumable.isPresent()) {
+            // Preserve the interrupted attempt as history; never reset completed results.
+            ReplyCoachAttempt previous = resumable.get();
+            previous.setStatus("ABANDONED");
+            attempts.save(previous);
+        }
 
         ReplyCoachAttempt attempt = new ReplyCoachAttempt();
         attempt.setEmail(email);
