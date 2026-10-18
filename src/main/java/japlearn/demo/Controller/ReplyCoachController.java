@@ -264,7 +264,10 @@ public class ReplyCoachController {
             record.setHelpTypes(new ArrayList<>(usedHelp));
             record.setSupported(!usedHelp.isEmpty());
         }
-        int earnedPoints = Math.max(0, choice.getPoints() - (hintUsed ? node.getHintPenalty() : 0));
+        boolean fittingReply = Set.of("BEST", "ACCEPTABLE").contains(
+                choice.getEvaluation() == null ? "" : choice.getEvaluation().toUpperCase(java.util.Locale.ROOT));
+        int earnedPoints = fittingReply
+                ? Math.max(0, choice.getPoints() - (hintUsed ? node.getHintPenalty() : 0)) : 0;
         record.setPoints(earnedPoints);
         record.setExplanation(choice.getExplanation());
         record.setCulturalNote(choice.getCulturalNote());

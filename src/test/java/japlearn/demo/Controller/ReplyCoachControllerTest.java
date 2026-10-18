@@ -62,4 +62,26 @@ class ReplyCoachControllerTest {
         assertThat(attempt.getCurrentNodeId()).isEqualTo("decision-1");
         assertThat(attempt.getSupportUsage().get("decision-1")).containsExactly("dialogueReview");
     }
+
+    @Test void unsuitableRepliesEarnZeroEvenWhenContentContainsPartialPoints() {
+        for (String evaluation : List.of("AWKWARD", "IMPOLITE", "RUDE")) {
+            attempt.getAnswers().clear();
+            attempt.setScore(0);
+            var choice = chapters.findById("chapter").orElseThrow().getNodes().get(0).getChoices().get(0);
+            choice.setEvaluation(evaluation);
+            choice.setPoints(1);
+            controller.answer("attempt", Map.of("nodeId", "decision-1", "choiceId", "best"));
+            assertThat(attempt.getAnswers().get(0).getPoints()).isZero();
+            assertThat(attempt.getScore()).isZero();
+        }
+    }
+
+    @Test void acceptableRepliesKeepTheirAuthoredPartialCredit() {
+        var choice = chapters.findById("chapter").orElseThrow().getNodes().get(0).getChoices().get(0);
+        choice.setEvaluation("ACCEPTABLE");
+        choice.setPoints(2);
+        controller.answer("attempt", Map.of("nodeId", "decision-1", "choiceId", "best"));
+        assertThat(attempt.getAnswers().get(0).getPoints()).isEqualTo(2);
+        assertThat(attempt.getScore()).isEqualTo(2);
+    }
 }
