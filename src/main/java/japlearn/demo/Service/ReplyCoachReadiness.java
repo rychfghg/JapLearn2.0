@@ -26,7 +26,7 @@ public class ReplyCoachReadiness {
     }
     public Map<String, Object> policy() {
         return Map.of("thresholdPercent", threshold, "questionCount", 10, "provisional", true,
-            "label", "Pilot policy · instructor approval pending");
+            "label", "Automatic readiness result · " + threshold + "% independent correct required");
     }
     public ReadinessRun latest(ReplyCoachAttempt attempt) {
         var runs = attempt.getReadinessRuns();
