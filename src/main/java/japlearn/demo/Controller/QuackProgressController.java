@@ -28,14 +28,16 @@ public class QuackProgressController {
     private final ReplyCoachAttemptRepository replyAttempts;
     private final QuackTalkSessionRepository talkSessions;
     private final ScoreRepository scores;
+    private final japlearn.demo.Service.LearningHistoryService learningHistory;
 
     public QuackProgressController(SituationalAttemptRepository situationalAttempts,
             ReplyCoachAttemptRepository replyAttempts, QuackTalkSessionRepository talkSessions,
-            ScoreRepository scores) {
+            ScoreRepository scores, japlearn.demo.Service.LearningHistoryService learningHistory) {
         this.situationalAttempts = situationalAttempts;
         this.replyAttempts = replyAttempts;
         this.talkSessions = talkSessions;
         this.scores = scores;
+        this.learningHistory = learningHistory;
     }
 
     @GetMapping("/analytics")
@@ -46,10 +48,10 @@ public class QuackProgressController {
         List<Score> arcade = scores.findByEmailIgnoreCaseOrderByDateDesc(email);
 
         List<Map<String, Object>> modules = new ArrayList<>();
-        addModule(modules, "Recognition", averageSituational(situational, "RECOGNITION"));
-        addModule(modules, "Expression Match", averageSituational(situational, "EXPRESSION_MATCH"));
-        addModule(modules, "Politeness", averageSituational(situational, "POLITENESS"));
-        addModule(modules, "Reply Coach", averageReplies(replies));
+        if (situational.stream().anyMatch(a -> a.isCompleted() && "RECOGNITION".equalsIgnoreCase(a.getGameType()))) addModule(modules, "Recognition", averageSituational(situational, "RECOGNITION"));
+        if (situational.stream().anyMatch(a -> a.isCompleted() && "EXPRESSION_MATCH".equalsIgnoreCase(a.getGameType()))) addModule(modules, "Expression Match", averageSituational(situational, "EXPRESSION_MATCH"));
+        if (situational.stream().anyMatch(a -> a.isCompleted() && "POLITENESS".equalsIgnoreCase(a.getGameType()))) addModule(modules, "Politeness", averageSituational(situational, "POLITENESS"));
+        if (replies.stream().anyMatch(a -> "COMPLETED".equalsIgnoreCase(a.getStatus()))) addModule(modules, "Reply Coach", averageReplies(replies));
         addArcadeModule(modules, arcade, "QUACKRESPONSE_RUSH", "Response Rush");
         addArcadeModule(modules, arcade, "QUACKRESPONSE_RELAY", "Dialogue Relay");
         int quackTalkAverage = averageTalk(talk);
@@ -61,11 +63,8 @@ public class QuackProgressController {
         addArcadeModule(modules, arcade, "QUACKSLATE", "QuackSlate");
 
         int overall = (int) Math.round(modules.stream().mapToInt(item -> (int) item.get("value")).average().orElse(0));
-        int situationalAccuracy = averageAvailable(
-                averageSituational(situational, "RECOGNITION"),
-                averageSituational(situational, "EXPRESSION_MATCH"),
-                averageSituational(situational, "POLITENESS"));
-        int interactionAccuracy = averageAvailable(averageReplies(replies), averageTalk(talk));
+        int situationalAccuracy = (int)Math.round(modules.stream().filter(item -> List.of("Recognition","Expression Match","Politeness").contains(item.get("label"))).mapToInt(item -> (int)item.get("value")).average().orElse(0));
+        int interactionAccuracy = (int)Math.round(modules.stream().filter(item -> List.of("Reply Coach","Response Rush","Dialogue Relay","QuackTalk").contains(item.get("label"))).mapToInt(item -> (int)item.get("value")).average().orElse(0));
 
         List<String> weakAreas = modules.stream()
                 .filter(item -> (int) item.get("value") < 70)
@@ -84,34 +83,19 @@ public class QuackProgressController {
                                         : "Talk with Sumi: ") + area))
                 .distinct().limit(Math.max(0, 6 - mistakes.size())).forEach(mistakes::add);
 
-        List<Map<String, Object>> history = new ArrayList<>();
-        situational.stream().filter(SituationalAttempt::isCompleted).limit(12)
-                .forEach(item -> history.add(history(item.getGameType().replace('_', ' '), (int) Math.round(item.getAccuracy()))));
-        replies.stream().filter(item -> "COMPLETED".equalsIgnoreCase(item.getStatus())).limit(8)
-                .forEach(item -> history.add(history("Reply Coach · " + item.getChapterTitle(), item.getFinalPercentage())));
-        talk.stream().filter(QuackTalkSession::isEvaluated).filter(item -> item.getScore() != null).limit(12)
-                .forEach(item -> {
-                    if ("TALK_WITH_SUMI".equalsIgnoreCase(item.getRoomType())) {
-                        // Reported separately: response fit (context) counts for conversational accuracy; pronunciation does not.
-                        if (item.getContextualAccuracy() != null) history.add(history("QuackTalk · Talk with Sumi · Response fit", item.getContextualAccuracy()));
-                        if (item.getPronunciationScore() != null) history.add(history("QuackTalk · Talk with Sumi · Pronunciation", item.getPronunciationScore()));
-                    } else {
-                        if (item.getContextualAccuracy() != null) history.add(history("QuackTalk · Guided Phrase · Response fit", item.getContextualAccuracy()));
-                        if (item.getPronunciationScore() != null) history.add(history("QuackTalk · Guided Phrase · Pronunciation", item.getPronunciationScore()));
-                    }
-                });
-        arcade.stream().filter(this::isPersonalProgressScore).limit(12)
-                .forEach(item -> history.add(history(displayGame(item.getGame()), scorePercent(item))));
+        List<Map<String,Object>> history = learningHistory.history(email, situational, replies, talk, arcade);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("overallMastery", overall);
         result.put("situationalAccuracy", situationalAccuracy);
         result.put("interactionAccuracy", interactionAccuracy);
-        result.put("progressSummary", overall == 0 ? "Complete a communication game to begin your report." : "Your overall communication mastery is " + overall + "% across " + modules.size() + " practiced areas.");
+        result.put("progressSummary", modules.isEmpty() ? "Complete a communication game to begin your report." : "Your overall communication mastery is " + overall + "% across " + modules.size() + " practiced areas.");
         result.put("recommendation", weakAreas.isEmpty() ? "Keep replaying completed activities to maintain mastery." : "Focus next on " + weakAreas.get(0).replace(" needs reinforcement", "") + ".");
         result.put("weakAreas", weakAreas);
         result.put("repeatedMistakes", mistakes);
         result.put("history", history);
+        result.put("attemptCount", history.size());
+        result.put("completedActivities", history.stream().filter(item -> "COMPLETED".equals(item.get("status"))).count());
         result.put("moduleAccuracy", modules);
         result.put("quackTalkBreakdown", quackTalkBreakdown(talk));
         return result;
@@ -148,9 +132,9 @@ public class QuackProgressController {
                 "stages", stages, "reinforcement", reinforcement);
     }
 
-    private void addModule(List<Map<String, Object>> modules, String label, int value) { if (value > 0) modules.add(Map.of("label", label, "value", value)); }
+    private void addModule(List<Map<String, Object>> modules, String label, int value) { modules.add(Map.of("label", label, "value", value)); }
     private void addArcadeModule(List<Map<String, Object>> modules, List<Score> records, String game, String label) {
-        records.stream().filter(this::isPersonalProgressScore).filter(item -> game.equalsIgnoreCase(item.getGame())).mapToInt(this::scorePercent).max().ifPresent(value -> addModule(modules, label, value));
+        records.stream().filter(this::isPersonalProgressScore).filter(Score::isCompleted).filter(item -> game.equalsIgnoreCase(item.getGame())).mapToInt(this::scorePercent).max().ifPresent(value -> addModule(modules, label, value));
     }
     private int averageSituational(List<SituationalAttempt> records, String type) { return (int) Math.round(records.stream().filter(SituationalAttempt::isCompleted).filter(item -> type.equalsIgnoreCase(item.getGameType())).mapToDouble(SituationalAttempt::getAccuracy).average().orElse(0)); }
     private int averageReplies(List<ReplyCoachAttempt> records) { return (int) Math.round(records.stream().filter(item -> "COMPLETED".equalsIgnoreCase(item.getStatus())).mapToInt(ReplyCoachAttempt::getFinalPercentage).average().orElse(0)); }
