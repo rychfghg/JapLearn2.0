@@ -41,13 +41,21 @@ class TalkWithSumiLevelTest {
     void beginnerWithoutEnoughHistory() {
         assertThat(levelFor()).isEqualTo("BEGINNER");
         assertThat(levelFor(sumi(90, 95))).isEqualTo("BEGINNER");
+        // One session with many turns is still only one measured session.
+        assertThat(levelFor(sumi(90, 95, 92))).isEqualTo("BEGINNER");
+        assertThat(levelFor(sumi(85, 90), sumi(80))).isEqualTo("BEGINNER");
     }
 
     @Test
-    void levelFollowsRecentContextScores() {
-        assertThat(levelFor(sumi(40, 50, 55))).isEqualTo("BEGINNER");
-        assertThat(levelFor(sumi(65, 70, 72))).isEqualTo("DEVELOPING");
-        assertThat(levelFor(sumi(85, 90), sumi(80))).isEqualTo("CONFIDENT");
+    void levelFollowsRecentSessionAverages() {
+        assertThat(levelFor(sumi(40), sumi(50), sumi(55))).isEqualTo("BEGINNER");
+        assertThat(levelFor(sumi(65, 70), sumi(72), sumi(60))).isEqualTo("DEVELOPING");
+        assertThat(levelFor(sumi(85, 90), sumi(80), sumi(95, 85))).isEqualTo("CONFIDENT");
+    }
+
+    @Test
+    void usesOnlyTheThreeMostRecentSessions() {
+        assertThat(levelFor(sumi(90), sumi(85), sumi(88), sumi(10), sumi(10))).isEqualTo("CONFIDENT");
     }
 
     @Test
